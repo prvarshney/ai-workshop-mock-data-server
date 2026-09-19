@@ -22,7 +22,7 @@ from typing import Any, Optional
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 # --------------------------------------------------------------------------
@@ -196,14 +196,19 @@ app = FastAPI(title="SkyBook Mock API",
               description="Flights, bookings and weather for the AI Agents workshop.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-QUIET_PATHS = {"/", "/api/dashboard", "/docs", "/openapi.json", "/redoc", "/favicon.ico"}
+QUIET_PATHS = {"/", "/dashboard", "/api/dashboard", "/docs", "/openapi.json",
+               "/redoc", "/favicon.ico"}
+# Pulse polls /quiz/state about 75 times a second; none of that belongs in the
+# panel that is meant to show the students' agents calling SkyBook.
+QUIET_PREFIXES = ("/quiz",)
 
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Print and remember every student request so the dashboard can show it."""
     response = await call_next(request)
-    if request.url.path not in QUIET_PATHS:
+    path = request.url.path
+    if path not in QUIET_PATHS and not path.startswith(QUIET_PREFIXES):
         query = "?" + request.url.query if request.url.query else ""
         line = (f"[{datetime.now().strftime('%H:%M:%S')}] {request.method} "
                 f"{request.url.path}{query} -> {response.status_code}")
@@ -345,10 +350,20 @@ def weather_by_path(city: str):
     return load_hash("weather:" + resolve_city(city).upper())
 
 
+def clear_skybook():
+    """Delete only SkyBook's own keys. Pulse shares this Redis database, so a
+    FLUSHDB here would wipe every student's quiz answers."""
+    for pattern in ("flight:*", "flights:*", "booking:*", "weather:*"):
+        keys = list(db.scan_iter(match=pattern, count=500))
+        if keys:
+            db.delete(*keys)
+    db.delete("bookings:all", "log", "seeded")
+
+
 @app.post("/reset", tags=["admin"])
 def reset():
     """Wipe every booking and put all the seats back. Use between demos."""
-    db.flushdb()
+    clear_skybook()
     seed()
     return {"status": "reset"}
 
@@ -372,7 +387,7 @@ def dashboard_data():
     }
 
 
-@app.get("/", include_in_schema=False, response_class=HTMLResponse)
+@app.get("/dashboard", include_in_schema=False, response_class=HTMLResponse)
 def dashboard_page():
     return DASHBOARD_HTML
 
@@ -512,6 +527,9 @@ setInterval(refresh, 1500);
 # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Only when SkyBook runs on its own - main.py serves its own index page here.
+    app.get("/", include_in_schema=False)(lambda: RedirectResponse("/dashboard"))
+
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))           # no packet is sent, this just finds our LAN IP
@@ -521,7 +539,7 @@ if __name__ == "__main__":
         lan_ip = "localhost"
     print("\n  SkyBook mock API"
           f"\n  storage    : {STORAGE}"
-          f"\n  dashboard  : http://{lan_ip}:8001/"
+          f"\n  dashboard  : http://{lan_ip}:8001/dashboard"
           f"\n  swagger    : http://{lan_ip}:8001/docs"
           "\n  students use the address above (not localhost)\n", flush=True)
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="warning")

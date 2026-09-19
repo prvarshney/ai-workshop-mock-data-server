@@ -1,156 +1,120 @@
-# ✈ SkyBook — mock flight API for the AI Agents workshop
+# AI Agents Workshop — Chandigarh University
 
-A tiny, offline, single-file API that student agents can call: search flights,
-book seats, cancel, and check the weather. Everything the agents do shows up on
-a live dashboard you can project on the big screen.
+Two apps for a 3-hour workshop, both running on the instructor's laptop, both
+working with no internet at all.
 
-Nothing leaves the laptop — no API keys, no internet, no sign-up.
+| | What it is |
+| --- | --- |
+| **Pulse** | A live quiz. Students join from their phones with a QR code; you launch questions and the results land on the projector. |
+| **SkyBook** | A mock flight-booking API. Students point their own LLM agents at it, and every booking appears on a live dashboard. |
 
 ---
 
-## 1. Install
+## Run everything
 
 ```bash
-pip install fastapi uvicorn redis fakeredis
+pip install -r requirements.txt
+python main.py
 ```
 
-Python 3.10 or newer (3.9 also works).
-
-## 2. Run
-
-```bash
-python mock_server.py
-```
-
-You should see:
+One process, one port, one address to write on the board:
 
 ```
-  SkyBook mock API
-  storage    : redis
-  dashboard  : http://192.168.1.41:8001/
-  swagger    : http://192.168.1.41:8001/docs
-  students use the address above (not localhost)
+  index      : http://192.168.1.41:8000/
+  students   : http://192.168.1.41:8000/quiz
+  projector  : http://192.168.1.41:8000/quiz/screen
+  instructor : http://192.168.1.41:8000/quiz/admin
+  skybook    : http://192.168.1.41:8000/dashboard
+  api docs   : http://192.168.1.41:8000/docs
 ```
 
-| URL | What it is |
+| URL | What opens |
 | --- | --- |
-| `http://<your-ip>:8001/` | Live dashboard — project this |
-| `http://<your-ip>:8001/docs` | Swagger UI — click endpoints and try them live |
-| `http://<your-ip>:8001/health` | Quick "is it up?" check |
+| `/` | Index page with big links to everything below |
+| `/quiz` | **Pulse** — students, on their phones |
+| `/quiz/screen` | **Pulse** — the projector: QR code, then live results |
+| `/quiz/admin` | **Pulse** — your control panel (asks for the password) |
+| `/dashboard` | **SkyBook** — live bookings from the students' agents |
+| `/docs` | Swagger for both APIs together |
+| `/health` | Is it up, and which storage it is using |
 
-## 3. Redis (optional)
+Change the port with `PORT=8080 python main.py`.
 
-SkyBook keeps its data in Redis. **If Redis is not running it automatically
-falls back to `fakeredis`**, an in-memory stand-in, and prints a warning. The
-API behaves exactly the same — the only difference is that data disappears when
-you stop the server. For a workshop that is usually fine.
+**Open the projector page only after joining the venue Wi-Fi.** The QR code is
+built from the laptop's LAN IP, which changes with the network.
 
-Use real Redis if you want bookings to survive a server restart.
+## Before the session
+
+```bash
+export ADMIN_PASSWORD="something-only-you-know"
+export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+python main.py
+```
+
+The Pulse admin password defaults to `cu2026` — change it, because students can
+reach the admin page too. Setting `JWT_SECRET` means restarting the server does
+not log you out. On Windows PowerShell use `$env:ADMIN_PASSWORD="..."`.
+
+## Redis is optional
+
+Both apps keep their live state in Redis and **fall back to `fakeredis`
+automatically** if it is not running, printing a warning. Everything still
+works; the only difference is that data is lost when you stop the server.
 
 | Platform | Command |
 | --- | --- |
 | macOS | `brew install redis` then `brew services start redis` |
-| Docker (any OS) | `docker run -d -p 6379:6379 --name skybook-redis redis` |
-| Windows | Install [Memurai](https://www.memurai.com/) (a Redis build for Windows), or use Docker / WSL |
+| Docker | `docker run -d -p 6379:6379 --name workshop-redis redis` |
+| Windows | [Memurai](https://www.memurai.com/), or Docker / WSL |
 
-Point somewhere else with an environment variable if you need to:
+The two apps share one Redis database but never touch each other's keys —
+Pulse owns everything under `pulse:`, SkyBook owns the rest. Neither reset
+button affects the other app, and `smoke_test_all.py` checks exactly that.
 
-```bash
-REDIS_URL=redis://localhost:6379/0 python mock_server.py
-```
-
-## 4. Tell students your IP address
-
-Everyone must be on the same Wi-Fi. `localhost` only works on your own machine,
-so give students the LAN address, e.g. `http://192.168.1.41:8001`.
+## Finding your LAN IP
 
 | Platform | Command |
 | --- | --- |
-| macOS | `ipconfig getifaddr en0` (Wi-Fi) |
+| macOS | `ipconfig getifaddr en0` |
 | Linux | `hostname -I` |
-| Windows | `ipconfig` → look for "IPv4 Address" |
+| Windows | `ipconfig` → "IPv4 Address" |
 
-The server prints this address on startup too. If students cannot reach it,
-it is almost always the laptop's firewall — allow incoming connections on
-port 8001.
+`main.py` prints it on startup too. If phones cannot reach you it is almost
+always the laptop firewall — allow incoming connections on the port.
 
-## 5. Endpoints
+## Running one app on its own
 
-All responses are JSON. Errors look like `{"detail": "..."}`.
-
-| Method | Path | What it does |
-| --- | --- | --- |
-| GET | `/health` | `{"status":"ok","storage":"redis","server_time":"14:05:22"}` |
-| GET | `/cities` | The 12 cities you can fly between |
-| GET | `/flights?source=&destination=&max_price=` | Search a route, cheapest first. `max_price` optional. `404` unknown city, `400` if source == destination |
-| GET | `/flights/{flight_id}` | One flight, e.g. `/flights/6E204`. `404` if unknown |
-| POST | `/bookings` | Body `{"flight_id":"6E204","passenger_name":"Aarav","seats":2}` → `201` with a PNR. `404` unknown flight, `409` not enough seats |
-| GET | `/bookings` | Every booking, newest first |
-| GET | `/bookings/{pnr}` | One booking. PNR is case-insensitive |
-| DELETE | `/bookings/{pnr}` | Cancel and put the seats back. `409` if already cancelled |
-| GET | `/weather?city=Goa` | Full weather record for one city |
-| GET | `/weather/{city}` | Same thing, as a path |
-| GET | `/weather` | One-line summary for all 12 cities |
-| POST | `/reset` | Delete every booking and re-seed. Use between demos |
-
-Cities: Chandigarh, Delhi, Mumbai, Bengaluru, Hyderabad, Chennai, Kolkata,
-Goa, Jaipur, Pune, Lucknow, Ahmedabad. City names are case-insensitive, so
-`goa`, `Goa` and `  GOA ` all work.
-
-### Try it from the terminal
+Both still work alone, on their own ports:
 
 ```bash
-curl "http://localhost:8001/flights?source=Chandigarh&destination=Goa"
-
-curl -X POST http://localhost:8001/bookings \
-  -H "Content-Type: application/json" \
-  -d '{"flight_id":"SG723","passenger_name":"Aarav Sharma","seats":2}'
-
-curl http://localhost:8001/weather/goa
+python mock_server.py     # SkyBook only, port 8001
+python pulse/pulse.py     # Pulse only,  port 8000
 ```
 
-## 6. Between demos
+## Tests
 
 ```bash
-curl -X POST http://localhost:8001/reset
+python smoke_test_all.py      # 15 checks: the two apps sharing one process
+python smoke_test.py          # 26 checks: SkyBook on its own
+python pulse/smoke_test.py    # 40 checks: Pulse on its own
 ```
 
-Wipes every booking, restores all seats to 500, and regenerates the same
-flights and weather as before. The dashboard goes back to
-"Waiting for the first agent to book a flight…" within 1.5 seconds.
-
-## 7. Good to know
-
-- **Everything is deterministic.** Flights and weather are generated once with
-  `random.seed(42)`, so every student searching Chandigarh → Goa sees the same
-  four flights at the same prices. Only bookings change anything.
-- **500 seats per flight.** 150 students booking several times each will never
-  sell out a popular route.
-- **Restarting is safe.** With real Redis, stopping and restarting the server
-  keeps every student's booking.
-- **Small models send `"2"` instead of `2`.** The booking endpoint accepts a
-  numeric string for `seats`, so llama3.2:3b does not trip over it.
-- **The dashboard polls** `GET /api/dashboard` every 1.5 seconds. That request
-  and the docs are hidden from the API traffic panel, so you only see student
-  traffic.
-
-## 8. Checking it works
-
-```bash
-pip install requests
-python smoke_test.py                       # or: python smoke_test.py http://192.168.1.41:8001
-```
-
-26 checks covering determinism, booking, cancelling, seat restoration, error
-codes and `/reset`.
-
-Note: the smoke test calls `/reset`, so it wipes every booking on the server it
-points at. Do not run it in the middle of the workshop.
+Each test starts what it needs and uses throwaway data, so none of them
+disturb a live session — except `smoke_test.py`, which calls SkyBook's
+`/reset`. Do not run that one mid-workshop.
 
 ## Files
 
 | File | What it is |
 | --- | --- |
-| `mock_server.py` | The whole server: data, API and dashboard |
-| `smoke_test.py` | End-to-end check |
-| `README.md` | This file |
+| `main.py` | Runs both apps together on one port — **start here** |
+| `mock_server.py` | SkyBook: the flight API and its dashboard |
+| `pulse/` | Pulse: the quiz app (`pulse.py`, `pages.py`, `storage.py`, `auth.py`) |
+| `pulse/pulse.db` | The question bank — your content, committed to the repo |
+| `SKYBOOK.md` | SkyBook in detail: endpoints, data, curl examples |
+| `pulse/README.md` | Pulse in detail: running a session, endpoints, settings |
+
+## Detailed docs
+
+- **[SkyBook](SKYBOOK.md)** — every endpoint, the flight and weather data, `/reset`
+- **[Pulse](pulse/README.md)** — running a session, the question editor, exports

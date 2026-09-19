@@ -17,9 +17,14 @@ import io
 import json
 import os
 import socket
+import sys
 import time
 import uuid
 from typing import Any, List, Optional
+
+# Look for auth.py / storage.py / pages.py next to this file, so Pulse works
+# both as "python pulse.py" and when main.py imports it from the folder above.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import qrcode
 import uvicorn

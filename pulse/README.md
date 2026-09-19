@@ -22,6 +22,10 @@ Python 3.10 or newer (3.9 also works).
 python pulse.py
 ```
 
+Or run Pulse and SkyBook together on one port with `python main.py`
+from the repo root (see the [project README](../README.md)). Everything below
+applies either way; only the port changes.
+
 You will see something like:
 
 ```
