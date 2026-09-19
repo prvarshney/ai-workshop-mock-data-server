@@ -180,9 +180,14 @@ if (sid) showLive();
 
 PAGE_SCREEN = """<!doctype html><html><head><meta charset="utf-8">
 <title>Pulse - screen</title><style>/*CSS*/
-body{height:100vh;overflow:hidden;display:flex;flex-direction:column;padding:28px 34px}
-#prompt{font-size:56px;font-weight:800;line-height:1.2;margin:0 0 26px}
-/* the stage clips: results never spill over the prompt or the footer */
+body{height:100vh;overflow:hidden;padding:24px 28px;display:flex}
+.screen{display:flex;gap:22px;width:100%;height:100%;min-height:0}
+/* 65 / 35 - the question and its results on the left, the room on the right */
+.main{flex:0 0 65%;max-width:65%;display:flex;flex-direction:column;min-width:0;min-height:0}
+.main.full{flex:1 1 100%;max-width:100%}
+.side{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
+.side[hidden]{display:none}
+#prompt{font-size:50px;font-weight:800;line-height:1.2;margin:0 0 22px}
 #stage{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
 #stage.top{justify-content:flex-start}
 .qr{display:flex;align-items:center;justify-content:center;gap:60px;height:100%}
@@ -190,52 +195,95 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column;padding:28p
 .qr .join{font-size:34px;color:var(--mut)}
 .qr .url{font-size:46px;font-weight:800;color:var(--acc);word-break:break-all;margin-top:10px}
 .row{margin-bottom:20px}
-.rowtop{display:flex;justify-content:space-between;font-size:34px;font-weight:700;margin-bottom:8px}
-.track{height:46px;background:#1E1E1E;border-radius:10px;overflow:hidden}
+.rowtop{display:flex;justify-content:space-between;font-size:32px;font-weight:700;margin-bottom:8px}
+.track{height:42px;background:#1E1E1E;border-radius:10px;overflow:hidden}
 .fill{height:100%;background:var(--acc);width:0;transition:width .6s ease-out;border-radius:10px}
 .row.correct .fill{background:var(--grn)} .row.dim{opacity:.35}
-.wall{column-count:3;column-gap:18px}
-.wall .a{break-inside:avoid;background:var(--card);border-radius:14px;padding:14px 18px;margin-bottom:18px}
-.wall .who{font-size:16px;color:var(--mut);margin-bottom:4px}
-.wall .txt{font-size:24px;line-height:1.3}
+.wall{column-count:2;column-gap:18px}
+.wall .a{break-inside:avoid;background:var(--card);border-radius:14px;padding:13px 16px;margin-bottom:16px}
+.wall .who{font-size:15px;color:var(--mut);margin-bottom:4px}
+.wall .txt{font-size:23px;line-height:1.3}
 .wall .a.new{animation:pop .45s ease-out}
 @keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
-.donutwrap{display:flex;align-items:center;justify-content:center;gap:70px}
-.legend div{font-size:30px;margin-bottom:14px;display:flex;align-items:center;gap:14px}
-.swatch{width:26px;height:26px;border-radius:7px;display:inline-block}
+.donutwrap{display:flex;align-items:center;justify-content:center;gap:46px}
+.legend div{font-size:26px;margin-bottom:12px;display:flex;align-items:center;gap:12px}
+.swatch{width:24px;height:24px;border-radius:7px;display:inline-block}
+.cmp{display:flex;gap:34px}.cmp>div{flex:1;min-width:0}
 .row.sc{margin-bottom:12px}
-.sc .rowtop{font-size:26px;margin-bottom:5px}
-.sc .track{height:34px}
-.cmp{display:flex;gap:50px}.cmp>div{flex:1;min-width:0}
-.cmphead{font-size:28px;color:var(--mut);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;min-height:28px}
-.avg{font-size:64px;font-weight:800;color:var(--acc);text-align:center;margin-top:6px}
-.avg span{font-size:26px;color:var(--mut);display:block;font-weight:600;letter-spacing:1px}
-footer{display:flex;justify-content:space-between;font-size:30px;color:var(--mut);padding-top:16px}
-/* a 720p projector gets the same layout, just smaller, so nothing is cut off */
+.sc .rowtop{font-size:24px;margin-bottom:5px}
+.sc .track{height:32px}
+.cmphead{font-size:26px;color:var(--mut);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;min-height:26px}
+.avg{font-size:58px;font-weight:800;color:var(--acc);text-align:center;margin-top:6px}
+.avg span{font-size:22px;color:var(--mut);display:block;font-weight:600;letter-spacing:1px}
+footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut);padding-top:14px}
+
+/* the right-hand column: answered on top, still waiting underneath */
+.panel{flex:1;background:var(--card);border-radius:16px;padding:16px 18px;
+  display:flex;flex-direction:column;min-height:0}
+.panel h2{font-size:21px;color:var(--mut);margin:0 0 12px;text-transform:uppercase;
+  letter-spacing:1px;display:flex;justify-content:space-between;align-items:baseline}
+.panel h2 b{font-size:30px;color:var(--acc)}
+.panel h2.ok b{color:var(--grn)}
+.list{overflow-y:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#4A5168 transparent}
+.list::-webkit-scrollbar{width:9px}
+.list::-webkit-scrollbar-thumb{background:#4A5168;border-radius:5px}
+.who2{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid #343945;cursor:pointer}
+.who2 .nm{font-size:21px;font-weight:700;flex:0 0 auto;max-width:44%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who2 .an{font-size:19px;color:var(--acc);flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who2.open .an{white-space:normal;overflow:visible;text-overflow:clip}
+.who2.open{background:#1E1E1E;border-radius:10px;padding:8px 10px}
+.wait{display:inline-block;font-size:19px;padding:6px 12px;margin:0 8px 8px 0;
+  border-radius:999px;background:#1E1E1E;color:var(--mut)}
+.empty2{color:var(--mut);font-size:19px;padding:8px 0}
+.new2{animation:pop .4s ease-out}
+
 @media (max-height:820px){
-  #prompt{font-size:42px;margin-bottom:16px}
-  .rowtop{font-size:26px}.track{height:34px}.row{margin-bottom:14px}
-  .row.sc{margin-bottom:8px}.sc .rowtop{font-size:21px}.sc .track{height:26px}
-  .cmphead{font-size:22px;min-height:22px}
-  .avg{font-size:46px}.avg span{font-size:18px}
-  .wall .txt{font-size:20px}.wall .who{font-size:14px}
-  .wall .a{padding:11px 14px;margin-bottom:13px}
-  .legend div{font-size:24px;margin-bottom:10px}
+  #prompt{font-size:38px;margin-bottom:14px}
+  .rowtop{font-size:24px}.track{height:30px}.row{margin-bottom:13px}
+  .row.sc{margin-bottom:8px}.sc .rowtop{font-size:20px}.sc .track{height:24px}
+  .cmphead{font-size:21px;min-height:21px}
+  .avg{font-size:42px}.avg span{font-size:17px}
+  .wall .txt{font-size:19px}.wall .who{font-size:13px}
+  .wall .a{padding:10px 13px;margin-bottom:12px}
+  .legend div{font-size:21px;margin-bottom:9px}
   .qr img{width:400px;height:400px}.qr .url{font-size:34px}.qr .join{font-size:26px}
-  footer{font-size:23px;padding-top:10px}
+  footer{font-size:21px;padding-top:9px}
+  .panel h2{font-size:17px}.panel h2 b{font-size:24px}
+  .who2 .nm{font-size:18px}.who2 .an{font-size:16px}
+  .wait{font-size:16px;padding:5px 10px}
 }
 </style></head><body>
-<h1 id="prompt"></h1>
-<div id="stage"></div>
-<footer><div id="answered"></div><div id="joined"></div></footer>
+<div class="screen">
+  <div class="main full" id="main">
+    <h1 id="prompt"></h1>
+    <div id="stage"></div>
+    <footer><div id="answered"></div><div id="joined"></div></footer>
+  </div>
+  <aside class="side" id="side" hidden>
+    <section class="panel">
+      <h2 class="ok">Answered <b id="acount">0</b></h2>
+      <div class="list" id="alist"></div>
+    </section>
+    <section class="panel">
+      <h2>Still to answer <b id="wcount">0</b></h2>
+      <div class="list" id="wlist"></div>
+    </section>
+  </aside>
+</div>
 <script>
 const JOIN_URL = "__JOIN_URL__";
 const COLORS = ["#5AD1FF","#4ADE80","#F87171","#FBBF24","#A78BFA","#F472B6","#2DD4BF","#FB923C"];
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const stage = document.getElementById("stage");
+const side = document.getElementById("side");
+const main = document.getElementById("main");
 let builtKey = "";            // rebuild the skeleton only when the question changes
-let seen = new Set();         // which text answers have already animated in
+let seen = new Set();         // text answers that have already animated in
+let opened = new Set();       // rows the instructor clicked open, kept across refreshes
+let seenWho = new Set();
 
 function pct(n, total){ return total ? Math.round(n * 100 / total) : 0; }
 
@@ -257,7 +305,7 @@ function paintBars(counts, reveal, correct){
 }
 
 function buildDonut(labels){
-  stage.innerHTML = '<div class="donutwrap"><svg id="dn" width="460" height="460" viewBox="0 0 42 42">' +
+  stage.innerHTML = '<div class="donutwrap"><svg id="dn" width="400" height="400" viewBox="0 0 42 42">' +
     labels.map((l, i) => '<circle class="sl" data-i="' + i + '" cx="21" cy="21" r="15.9" fill="none" ' +
       'stroke="' + COLORS[i % COLORS.length] + '" stroke-width="7" stroke-dasharray="0 100" ' +
       'transform="rotate(-90 21 21)" style="transition:stroke-dasharray .6s"></circle>').join("") +
@@ -283,25 +331,54 @@ function scaleBlock(title, counts, average){
     counts.map((c, i) => {
       const total = counts.reduce((a, b) => a + b, 0);
       return '<div class="row sc"><div class="rowtop"><span>' + (i + 1) + '</span><span>' + c +
-        "</span></div><div class=\\"track\\"><div class=\\"fill\\" style=\\"width:" +
-        pct(c, total) + '%"></div></div></div>';
+        "</span></div><div class='track'><div class='fill' style='width:" +
+        pct(c, total) + "%'></div></div></div>";
     }).join("") + '<div class="avg">' + average.toFixed(1) + "<span>AVERAGE</span></div></div>";
 }
 
 function showQR(){
+  side.hidden = true; main.classList.add("full");
   if (builtKey === "qr") return;
   builtKey = "qr";
   document.getElementById("prompt").textContent = "";
+  document.getElementById("answered").textContent = "";
   stage.innerHTML = '<div class="qr"><img src="/quiz/qr.svg" alt="Join QR code">' +
     '<div><div class="join">Scan to join</div><div class="url">' + esc(JOIN_URL) + "</div></div></div>";
 }
 
+// Right column. Long answers are cut with an ellipsis; hover shows the full text
+// as a tooltip and clicking the row expands it in place.
+function drawSide(d){
+  const a = d.answered_by || [], w = d.waiting || [];
+  document.getElementById("acount").textContent = a.length;
+  document.getElementById("wcount").textContent = w.length;
+  document.getElementById("alist").innerHTML = a.length
+    ? a.map(x => {
+        const key = x.name + "|" + x.answer;
+        const cls = (opened.has(key) ? " open" : "") + (seenWho.has(key) ? "" : " new2");
+        seenWho.add(key);
+        return '<div class="who2' + cls + '" data-k="' + esc(key) + '" title="' +
+               esc(x.name + " — " + x.answer) + '"><span class="nm">' + esc(x.name) +
+               '</span><span class="an">' + esc(x.answer) + "</span></div>";
+      }).join("")
+    : '<div class="empty2">nobody yet</div>';
+  document.getElementById("wlist").innerHTML = w.length
+    ? w.map(n => '<span class="wait">' + esc(n) + "</span>").join("")
+    : '<div class="empty2">everyone has answered</div>';
+  document.querySelectorAll("#alist .who2").forEach(el => el.onclick = () => {
+    const k = el.dataset.k;
+    if (opened.has(k)) opened.delete(k); else opened.add(k);
+    el.classList.toggle("open");
+  });
+}
+
 async function tick(){
   try {
-    const d = await (await fetch("/quiz/state")).json();
+    const d = await (await fetch("/quiz/board")).json();
     document.getElementById("joined").textContent = d.joined + " students joined";
     const q = d.open_question;
-    if (!q){ document.getElementById("answered").textContent = ""; showQR(); return; }
+    if (!q){ showQR(); return; }
+    side.hidden = false; main.classList.remove("full");
     document.getElementById("answered").textContent = d.answered + " answered";
     document.getElementById("prompt").textContent = q.prompt;
     stage.className = q.type === "text" ? "top" : "";
@@ -312,7 +389,7 @@ async function tick(){
       q.pie ? paintDonut(d.results.counts)
             : paintBars(d.results.counts, q.reveal, q.correct_index);
     } else if (q.type === "scale"){
-      builtKey = key;                       // redrawn each tick; no width animation to preserve
+      builtKey = key;
       stage.innerHTML = d.compare
         ? '<div class="cmp">' + scaleBlock("Start of session", d.compare.counts, d.compare.average) +
           scaleBlock("Now", d.results.counts, d.results.average) + "</div>"
@@ -327,6 +404,7 @@ async function tick(){
                '</div><div class="txt">' + esc(a.answer) + "</div></div>";
       }).join("");
     }
+    drawSide(d);
   } catch (e) { /* try again next tick */ }
 }
 tick(); setInterval(tick, 1500);

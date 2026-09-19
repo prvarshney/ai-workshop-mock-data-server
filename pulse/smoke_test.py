@@ -176,17 +176,40 @@ post(f"/quiz/admin/reveal/{q4}", headers=bearer(TOKEN))
 check("correct_index hidden again after toggling reveal off",
       "correct_index" not in get("/quiz/state").json()["open_question"])
 
+# ---- the projector board -------------------------------------------------
+print("\n-- the projector board")
+post(f"/quiz/admin/launch/{q1}", headers=bearer(TOKEN))
+for student, choice in zip(students, [0, 0, 1]):
+    post("/quiz/answer", json={"student_id": student["student_id"], "question_id": q1,
+                               "answer": choice})
+board = get("/quiz/board").json()
+check("/quiz/board lists who answered", len(board["answered_by"]) == 3, str(board["answered_by"]))
+check("it shows the option text, not the index",
+      all(b["answer"] in ("1st", "2nd") for b in board["answered_by"]), str(board["answered_by"]))
+check("nobody is waiting once all three have answered", board["waiting"] == [], str(board["waiting"]))
+
+extra = post("/quiz/join", json={"name": "Latecomer", "semester": "5th"}).json()
+board = get("/quiz/board").json()
+check("a student who has not answered shows up as waiting",
+      board["waiting"] == ["Latecomer"], str(board["waiting"]))
+post("/quiz/answer", json={"student_id": extra["student_id"], "question_id": q1, "answer": 2})
+board = get("/quiz/board").json()
+check("answering moves them out of the waiting list",
+      board["waiting"] == [] and len(board["answered_by"]) == 4, str(board))
+check("/quiz/state stays lean and does not carry the roster",
+      "answered_by" not in get("/quiz/state").json())
+
 # ---- export and resets ---------------------------------------------------
 print("\n-- export and resets")
 csv_text = get("/quiz/export", headers=bearer(TOKEN)).text
 rows = [ln for ln in csv_text.strip().splitlines() if ln][1:]
-check("CSV has one row per answer (5)", len(rows) == 5, f"{len(rows)} rows")
+check("CSV has one row per answer (4 on q1 + 2 on q3)", len(rows) == 6, f"{len(rows)} rows")
 check("CSV writes the option text, not the number",
       any(",1st," in ln or ",3rd," in ln for ln in rows), rows[0] if rows else "")
 
 post("/quiz/admin/reset?scope=answers", headers=bearer(TOKEN))
 state = get("/quiz/state").json()
-check("reset answers keeps the students", state["joined"] == 3)
+check("reset answers keeps the students", state["joined"] == 4, str(state["joined"]))
 check("reset answers closes the open question", state["open_question"] is None)
 
 post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))

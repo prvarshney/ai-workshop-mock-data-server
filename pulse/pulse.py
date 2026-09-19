@@ -245,6 +245,40 @@ def answer(body: AnswerBody):
     return {"ok": True}
 
 
+def answer_label(question, value):
+    """Turn a stored answer into something readable on the projector."""
+    if question["type"] == "choice":
+        i = int(value)
+        return question["options"][i] if 0 <= i < len(question["options"]) else str(value)
+    if question["type"] == "scale":
+        return f"{value} / 5"
+    return str(value)
+
+
+@router.get("/board", tags=["quiz"])
+def board():
+    """Everything the projector needs, including who has answered and who has
+    not. Only one browser polls this, so unlike /quiz/state it can afford to
+    read the whole roster."""
+    data = state()
+    question = current_question()
+    if not question:
+        return dict(data, answered_by=[], waiting=[])
+
+    qid = question["id"]
+    answered_sids = db.zrevrange(k_answers(qid), 0, -1)       # newest answer first
+    values = db.mget([k_answer(qid, s) for s in answered_sids]) if answered_sids else []
+    joined = db.lrange(K_STUDENTS, 0, -1)                     # newest joiner first
+    names = dict(zip(joined, student_names(joined)))
+    done = set(answered_sids)
+    return dict(
+        data,
+        answered_by=[{"name": names.get(sid) or "Someone", "answer": answer_label(question, v)}
+                     for sid, v in zip(answered_sids, values) if v is not None],
+        waiting=[names.get(sid) or "Someone" for sid in joined if sid not in done],
+    )
+
+
 @router.get("/qr.svg", tags=["quiz"])
 def qr(request: Request):
     return Response(qr_svg(join_url(request)), media_type="image/svg+xml")

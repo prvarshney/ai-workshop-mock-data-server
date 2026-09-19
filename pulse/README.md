@@ -148,6 +148,7 @@ Students (no login):
 | POST | `/quiz/join` | `{name, semester, email?}` → `{student_id, name}` |
 | GET | `/quiz/state` | The open question plus live results |
 | POST | `/quiz/answer` | `{student_id, question_id, answer}` |
+| GET | `/quiz/board` | Everything the projector shows, including who answered what |
 | GET | `/quiz/qr.svg` | The join QR code |
 | GET | `/quiz/screen` | The projector page |
 
