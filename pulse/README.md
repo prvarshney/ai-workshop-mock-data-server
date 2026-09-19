@@ -124,8 +124,22 @@ typo, or a handset being passed around. Answers they already sent stay with you,
 and rejoining without an email address counts as a new student on the roster.
 
 The question editor takes prompt, type, options (one per line), the correct
-answer, whether to draw a donut, and which earlier scale question to compare
-against. Everything saves straight to `pulse.db`.
+answer, whether to draw a donut, a **timer**, and which earlier scale question
+to compare against. Everything saves straight to `pulse.db`.
+
+### Timers
+
+Set **Timer (seconds after launch)** on a question and the countdown starts the
+moment you hit Launch. It shows big on the projector next to the prompt, and on
+every phone as "23s left to answer".
+
+When it reaches zero the phones stop accepting answers — buttons grey out and a
+late submission is refused — but **the question stays on the projector** with
+all its results and the answered / still-to-answer lists, so you can talk
+through it. Closing is still your call, with the Close button.
+
+Leave it at `0` for no time limit. **Launch** or **Launch fresh** restarts the
+clock, so you can re-run a question and give the room another go.
 
 Question 9 is set to compare with question 2 — the same confidence question
 asked at the start and at the end. The projector shows both, side by side,

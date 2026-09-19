@@ -45,6 +45,7 @@ db, STORAGE = _connect_redis()
 # Every Redis key Pulse uses starts with "pulse:" so it can share a database
 # with other apps, and so a reset never deletes anything that is not ours.
 K_OPEN = "pulse:open"
+K_UNTIL = "pulse:open_until"     # epoch seconds; after this, answers are refused
 K_STUDENTS = "pulse:students"
 
 
@@ -57,7 +58,7 @@ def k_reveal(qid):       return f"pulse:reveal:{qid}"
 
 def clear_redis(everything: bool) -> None:
     """Delete our keys. everything=False keeps the students who already joined."""
-    patterns = ["pulse:answer:*", "pulse:answers:*", "pulse:reveal:*", K_OPEN]
+    patterns = ["pulse:answer:*", "pulse:answers:*", "pulse:reveal:*", K_OPEN, K_UNTIL]
     if everything:
         patterns += ["pulse:student:*", "pulse:email:*", K_STUDENTS, "pulse:login_attempts:*"]
     for pattern in patterns:
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS questions (
     correct_index INTEGER,          -- NULL when there is no right answer
     pie           INTEGER DEFAULT 0,-- 1 = draw a donut on the projector
     compare_with  INTEGER,          -- id of an earlier question to show beside this one
+    seconds       INTEGER DEFAULT 0,-- countdown after launch; 0 means no time limit
     active        INTEGER DEFAULT 1,
     updated_at    TEXT)
 """
@@ -125,6 +127,10 @@ def init_db():
     """Create pulse.db on first run and put the starting questions in it."""
     sql("PRAGMA journal_mode=WAL")       # lets the projector read while the admin writes
     sql(SCHEMA)
+    # Older question banks were made before timers existed, so add the column.
+    have = {r["name"] for r in sql("PRAGMA table_info(questions)", fetch="all")}
+    if "seconds" not in have:
+        sql("ALTER TABLE questions ADD COLUMN seconds INTEGER DEFAULT 0")
     if sql("SELECT COUNT(*) AS n FROM questions", fetch="one")["n"]:
         return                           # already has questions - leave them alone
     ids = []
@@ -146,7 +152,8 @@ def to_dict(row):
         "id": row["id"], "position": row["position"], "type": row["type"],
         "prompt": row["prompt"], "options": json.loads(row["options"] or "[]"),
         "correct_index": row["correct_index"], "pie": bool(row["pie"]),
-        "compare_with": row["compare_with"], "active": row["active"],
+        "compare_with": row["compare_with"], "seconds": row["seconds"] or 0,
+        "active": row["active"],
         "updated_at": row["updated_at"],
     }
 
@@ -170,11 +177,12 @@ def next_position():
 def save_question(qid, data):
     """Create (qid=None) or update one question. Returns its id."""
     fields = (data["type"], data["prompt"], json.dumps(data["options"]),
-              data["correct_index"], 1 if data["pie"] else 0, data["compare_with"], now_iso())
+              data["correct_index"], 1 if data["pie"] else 0, data["compare_with"],
+              data["seconds"], now_iso())
     if qid:
         sql("UPDATE questions SET type=?, prompt=?, options=?, correct_index=?, pie=?,"
-            " compare_with=?, updated_at=? WHERE id=?", fields + (qid,))
+            " compare_with=?, seconds=?, updated_at=? WHERE id=?", fields + (qid,))
         return qid
     return sql("INSERT INTO questions (position, type, prompt, options, correct_index, pie,"
-               " compare_with, active, updated_at) VALUES (?,?,?,?,?,?,?,1,?)",
+               " compare_with, seconds, active, updated_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
                (next_position(),) + fields)

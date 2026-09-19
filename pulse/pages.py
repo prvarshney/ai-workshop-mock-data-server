@@ -62,6 +62,10 @@ textarea{min-height:130px;resize:vertical}
 .scale{display:flex;gap:10px}
 .scale .opt{text-align:center;padding:24px 0;font-size:26px}
 .scalelab{display:flex;justify-content:space-between;color:var(--mut);font-size:15px;margin-top:8px}
+#clock{font-size:20px;font-weight:800;color:var(--acc);margin-bottom:14px}
+#clock.low{color:var(--red)}
+#clock.up{color:var(--red)}
+.locked .opt,.locked textarea,.locked .primary{opacity:.45;pointer-events:none}
 .in{animation:slide .35s ease-out}
 @keyframes slide{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
 </style></head><body>
@@ -79,6 +83,7 @@ textarea{min-height:130px;resize:vertical}
 </section>
 <section id="live" hidden>
   <div id="waiting" class="card center"></div>
+  <div id="clock" hidden></div>
   <div id="qbox"></div>
 </section>
 <div class="toast" id="toast"><span class="tick">&#10003;</span><span>answer received</span></div>
@@ -89,8 +94,11 @@ let sid = localStorage.getItem("pulse_sid");
 let myName = localStorage.getItem("pulse_name") || "";
 let shownKey = "";                       // so we only redraw when the question really changes
 
-function toast(){ const t = document.getElementById("toast");
-  t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1400); }
+function toast(msg){ const t = document.getElementById("toast");
+  if (msg) t.lastElementChild.innerHTML = msg;
+  t.classList.add("show");
+  setTimeout(() => { t.classList.remove("show");
+                     setTimeout(() => t.lastElementChild.textContent = "answer received", 300); }, 1400); }
 
 document.getElementById("joinbtn").onclick = async () => {
   const name = document.getElementById("name").value.trim();
@@ -120,9 +128,35 @@ async function send(value){
   const r = await fetch("/quiz/answer", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({student_id: sid, question_id: shownId, answer: value})});
   if (r.ok) { localStorage.setItem("pulse_a_" + shownId, String(value)); toast(); }
+  else if (r.status === 409) { lock(); toast("&#9203; time is up"); }
+}
+
+// When the clock runs out the question stays on screen, it just stops taking
+// answers - same as the projector.
+function lock(){
+  document.getElementById("qbox").classList.add("locked");
+  const c = document.getElementById("clock");
+  c.hidden = false; c.className = "up"; c.textContent = "Time is up - answers closed";
+}
+
+let ticker = null;
+function startClock(left){
+  clearInterval(ticker);
+  const c = document.getElementById("clock");
+  if (left === null || left === undefined){ c.hidden = true; return; }
+  let n = left;
+  const paint = () => {
+    if (n <= 0){ lock(); clearInterval(ticker); return; }
+    c.hidden = false; c.className = n <= 10 ? "low" : "";
+    c.textContent = n + "s left to answer";
+    n -= 1;
+  };
+  paint();
+  ticker = setInterval(paint, 1000);
 }
 
 let shownId = null;
+let lastLeft = null;
 function draw(q){
   const mine = localStorage.getItem("pulse_a_" + q.id);
   let html = '<div class="card qcard in"><div class="prompt">' + esc(q.prompt) + "</div>";
@@ -137,6 +171,7 @@ function draw(q){
     html += '<textarea id="ta" maxlength="200" placeholder="Type your answer">' + esc(mine || "") +
             '</textarea><button class="primary" id="send">Submit</button>';
   document.getElementById("qbox").innerHTML = html + "</div>";
+  document.getElementById("qbox").classList.remove("locked");
 
   document.querySelectorAll(".opt").forEach(b => b.onclick = () => {
     document.querySelectorAll(".opt").forEach(x => x.classList.remove("on"));
@@ -153,13 +188,18 @@ async function tick(){
     const d = await (await fetch("/quiz/state")).json();
     const q = d.open_question;
     if (!q){ shownKey = ""; shownId = null;
+             clearInterval(ticker);
+             document.getElementById("clock").hidden = true;
              document.getElementById("qbox").innerHTML = "";
              document.getElementById("waiting").hidden = false; return; }
     document.getElementById("waiting").hidden = true;
     // Redraw only when the question changes - otherwise we would wipe what
     // the student is typing every two seconds.
     const key = q.id + "|" + q.prompt + "|" + q.options.join("~");
-    if (key !== shownKey){ shownKey = key; shownId = q.id; draw(q); }
+    if (key !== shownKey){ shownKey = key; shownId = q.id; draw(q); startClock(d.seconds_left); }
+    if (!d.accepting) lock();
+    else if (d.seconds_left !== null && Math.abs(d.seconds_left - lastLeft) > 2) startClock(d.seconds_left);
+    lastLeft = d.seconds_left;
   } catch (e) { /* server busy - try again next tick */ }
 }
 
@@ -187,7 +227,15 @@ body{height:100vh;overflow:hidden;padding:24px 28px;display:flex}
 .main.full{flex:1 1 100%;max-width:100%}
 .side{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
 .side[hidden]{display:none}
-#prompt{font-size:50px;font-weight:800;line-height:1.2;margin:0 0 22px}
+.head{display:flex;align-items:flex-start;gap:22px;margin:0 0 22px}
+#prompt{font-size:50px;font-weight:800;line-height:1.2;margin:0;flex:1;min-width:0}
+#timer{flex:0 0 auto;font-size:54px;font-weight:800;color:var(--acc);
+  background:#1E1E1E;border-radius:16px;padding:8px 20px;line-height:1.1;
+  font-variant-numeric:tabular-nums;text-align:center}
+#timer small{display:block;font-size:15px;color:var(--mut);letter-spacing:1px;font-weight:600}
+#timer.low{color:var(--red);animation:pulse 1s infinite}
+#timer.up{color:var(--red);font-size:34px;padding:16px 20px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 #stage{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
 /* the answer wall is the one result that can outgrow the screen, so it scrolls */
 #stage.top{justify-content:flex-start;overflow-y:auto;padding-right:8px;
@@ -244,7 +292,10 @@ footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut
 .new2{animation:pop .4s ease-out}
 
 @media (max-height:820px){
-  #prompt{font-size:38px;margin-bottom:14px}
+  #prompt{font-size:38px}
+  .head{margin-bottom:14px;gap:16px}
+  #timer{font-size:40px;padding:6px 15px}#timer small{font-size:12px}
+  #timer.up{font-size:26px;padding:12px 15px}
   .rowtop{font-size:24px}.track{height:30px}.row{margin-bottom:13px}
   .row.sc{margin-bottom:8px}.sc .rowtop{font-size:20px}.sc .track{height:24px}
   .cmphead{font-size:21px;min-height:21px}
@@ -261,7 +312,7 @@ footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut
 </style></head><body>
 <div class="screen">
   <div class="main full" id="main">
-    <h1 id="prompt"></h1>
+    <div class="head"><h1 id="prompt"></h1><div id="timer" hidden></div></div>
     <div id="stage"></div>
     <footer><div id="answered"></div><div id="joined"></div></footer>
   </div>
@@ -340,7 +391,29 @@ function scaleBlock(title, counts, average){
     }).join("") + '<div class="avg">' + average.toFixed(1) + "<span>AVERAGE</span></div></div>";
 }
 
+let ticker = null, lastLeft = null;
+// The countdown ticks locally between polls so it moves every second, not
+// every 1.5. When it hits zero the results stay up - only answering stops.
+function startTimer(left){
+  clearInterval(ticker);
+  const t = document.getElementById("timer");
+  if (left === null || left === undefined){ t.hidden = true; return; }
+  let n = left;
+  const paint = () => {
+    t.hidden = false;
+    if (n <= 0){ t.className = "up"; t.innerHTML = "TIME UP<small>ANSWERS CLOSED</small>";
+                 clearInterval(ticker); return; }
+    t.className = n <= 10 ? "low" : "";
+    t.innerHTML = n + "<small>SECONDS LEFT</small>";
+    n -= 1;
+  };
+  paint();
+  ticker = setInterval(paint, 1000);
+}
+
 function showQR(){
+  clearInterval(ticker);
+  document.getElementById("timer").hidden = true;
   side.hidden = true; main.classList.add("full");
   if (builtKey === "qr") return;
   builtKey = "qr";
@@ -395,6 +468,10 @@ async function tick(){
     document.getElementById("answered").textContent = d.answered + " answered";
     document.getElementById("prompt").textContent = q.prompt;
     stage.className = q.type === "text" ? "top" : "";
+    if (!d.accepting) startTimer(0);
+    else if (d.seconds_left === null) startTimer(null);
+    else if (lastLeft === null || Math.abs(d.seconds_left - lastLeft) > 2) startTimer(d.seconds_left);
+    lastLeft = d.seconds_left;
     const key = q.id + "|" + q.type + "|" + q.pie + "|" + q.options.join("~") + "|" + !!d.compare;
 
     if (q.type === "choice"){
@@ -565,8 +642,10 @@ async function load(){
   QS.forEach(q => { const el = document.getElementById("c" + q.id);
                     if (el) el.textContent = q.answers + " answers"; });
   const open = QS.find(q => q.open);
-  document.getElementById("openlbl").textContent =
-    open ? "Open now: " + open.prompt : "Nothing open - students see the waiting screen";
+  let label = open ? "Open now: " + open.prompt : "Nothing open - students see the waiting screen";
+  if (open && d.seconds_left !== null)
+    label += d.accepting ? "   (" + d.seconds_left + "s left)" : "   (time up - answers closed)";
+  document.getElementById("openlbl").textContent = label;
   const r = await (await api("/quiz/admin/roster")).json();
   document.getElementById("njoined").textContent = r.joined;
   const sems = Object.entries(r.by_semester).filter(([, n]) => n > 0);
@@ -582,7 +661,8 @@ function drawList(){
   document.getElementById("qs").innerHTML = QS.map((q, i) =>
     '<div class="q' + (q.open ? " live" : "") + '"><div class="qmain">' +
       '<div class="qp">' + (i + 1) + ". " + esc(q.prompt) + "</div>" +
-      '<div class="qmeta">' + q.type + ' &middot; <span id="c' + q.id + '">' + q.answers +
+      '<div class="qmeta">' + q.type + (q.seconds ? " &middot; " + q.seconds + "s timer" : "") +
+      ' &middot; <span id="c' + q.id + '">' + q.answers +
       " answers</span></div></div><div class=\\"qbtns\\">" +
       '<button class="go" onclick="launch(' + q.id + ',0)">Launch</button>' +
       '<button onclick="launch(' + q.id + ',1)">Fresh</button>' +
@@ -646,6 +726,8 @@ function editor(id){
    '<label>Correct answer</label><select id="e_correct"></select>' +
    '<div class="chk"><input type="checkbox" id="e_pie"' + (q.pie ? " checked" : "") +
    '><span>Show as a donut on the projector</span></div></div>' +
+   '<label>Timer (seconds after launch, 0 = no limit)</label>' +
+   '<input id="e_secs" type="number" min="0" max="3600" value="' + (q.seconds || 0) + '">' +
    '<div id="scalebits"><label>Compare with an earlier scale question</label>' +
    '<select id="e_cmp"><option value="">none</option>' +
      scales.map(s => '<option value="' + s.id + '"' + (q.compare_with === s.id ? " selected" : "") +
@@ -684,6 +766,7 @@ async function save(id, answers){
     type, prompt: document.getElementById("e_prompt").value,
     options, correct_index: correct === "" ? null : +correct,
     pie: document.getElementById("e_pie").checked,
+    seconds: +document.getElementById("e_secs").value || 0,
     compare_with: document.getElementById("e_cmp").value
       ? +document.getElementById("e_cmp").value : null});
   const r = id ? await api("/quiz/admin/question/" + id, {method: "PUT", body})

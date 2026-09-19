@@ -36,8 +36,8 @@ from pydantic import BaseModel
 import auth
 import storage
 from auth import require_admin
-from storage import (K_OPEN, K_STUDENTS, db, k_answer, k_answers, k_email,
-                     k_reveal, k_student)
+from storage import (K_OPEN, K_STUDENTS, K_UNTIL, db, k_answer, k_answers,
+                     k_email, k_reveal, k_student)
 
 PORT = int(os.environ.get("PORT", "8000"))   # same variable main.py uses
 
@@ -81,6 +81,15 @@ def current_question():
 
 def forget_cache():
     _open_cache["qid"] = _open_cache["question"] = None
+
+
+def countdown():
+    """(seconds_left, still_accepting). seconds_left is None when there is no timer."""
+    raw = db.get(K_UNTIL)
+    if not raw:
+        return None, True
+    left = float(raw) - time.time()
+    return max(0, int(left + 0.999)), left > 0
 
 
 def join_url(request: Request) -> str:
@@ -194,7 +203,7 @@ def state():
     joined = db.llen(K_STUDENTS)
     if not question:
         return {"open_question": None, "joined": joined, "answered": 0,
-                "results": None, "compare": None}
+                "results": None, "compare": None, "seconds_left": None, "accepting": True}
 
     reveal = bool(db.exists(k_reveal(question["id"])))
     shown = {"id": question["id"], "type": question["type"], "prompt": question["prompt"],
@@ -207,9 +216,11 @@ def state():
         other = storage.get_question(question["compare_with"])
         if other:
             compare = dict(tally(other), prompt=other["prompt"])
+    seconds_left, accepting = countdown()
     return {"open_question": shown, "joined": joined,
             "answered": db.zcard(k_answers(question["id"])),
-            "results": tally(question), "compare": compare}
+            "results": tally(question), "compare": compare,
+            "seconds_left": seconds_left, "accepting": accepting}
 
 
 @router.post("/answer", tags=["quiz"])
@@ -217,6 +228,10 @@ def answer(body: AnswerBody):
     question = current_question()
     if not question or str(question["id"]) != str(body.question_id):
         raise HTTPException(400, "That question is not open right now")
+    if not countdown()[1]:
+        # The question stays on the projector for discussion; it just stops
+        # taking answers.
+        raise HTTPException(409, "Time is up for this question")
     sid = str(body.student_id or "")
     if not db.exists(k_student(sid)):
         raise HTTPException(404, "Unknown student - please join again")
@@ -332,6 +347,7 @@ class QuestionBody(BaseModel):
     correct_index: Optional[int] = None
     pie: bool = False
     compare_with: Optional[int] = None
+    seconds: Any = 0                # countdown after launch; 0 = no time limit
 
 
 class MoveBody(BaseModel):
@@ -350,9 +366,14 @@ def clean(body: QuestionBody):
     correct = body.correct_index
     if body.type != "choice" or correct is None or not 0 <= correct < len(options):
         correct = None
+    try:
+        seconds = int(body.seconds or 0)
+    except (TypeError, ValueError):
+        seconds = 0
     return {"type": body.type, "prompt": prompt, "options": options, "correct_index": correct,
             "pie": bool(body.pie) and body.type == "choice",
-            "compare_with": body.compare_with if body.type == "scale" else None}
+            "compare_with": body.compare_with if body.type == "scale" else None,
+            "seconds": max(0, min(3600, seconds))}
 
 
 @router.get("/admin/questions", dependencies=ADMIN, tags=["quiz admin"])
@@ -364,7 +385,9 @@ def admin_questions():
         q["answers"] = db.zcard(k_answers(q["id"]))
         q["reveal"] = bool(db.exists(k_reveal(q["id"])))
         q["open"] = (q["id"] == open_id)
-    return {"questions": questions, "open": open_id}
+    seconds_left, accepting = countdown()
+    return {"questions": questions, "open": open_id,
+            "seconds_left": seconds_left, "accepting": accepting}
 
 
 @router.post("/admin/question", dependencies=ADMIN, tags=["quiz admin"])
@@ -415,18 +438,23 @@ def move_question(qid: int, body: MoveBody):
 
 @router.post("/admin/launch/{qid}", dependencies=ADMIN, tags=["quiz admin"])
 def launch(qid: int, fresh: int = 0):
-    if not storage.get_question(qid):
+    question = storage.get_question(qid)
+    if not question:
         raise HTTPException(404, "No such question")
     if fresh:
         clear_answers(qid)
     db.set(K_OPEN, qid)                 # only one question is ever open
+    if question["seconds"]:             # start the countdown from right now
+        db.set(K_UNTIL, time.time() + question["seconds"])
+    else:
+        db.delete(K_UNTIL)
     forget_cache()
-    return {"ok": True, "open": qid}
+    return {"ok": True, "open": qid, "seconds": question["seconds"]}
 
 
 @router.post("/admin/close", dependencies=ADMIN, tags=["quiz admin"])
 def close():
-    db.delete(K_OPEN)
+    db.delete(K_OPEN, K_UNTIL)
     forget_cache()
     return {"ok": True}
 

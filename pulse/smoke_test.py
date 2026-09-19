@@ -100,6 +100,10 @@ check("correct password returns a token", r.status_code == 200 and "token" in r.
 TOKEN = r.json()["token"]
 check("login also sets an HttpOnly cookie", "pulse_admin" in r.cookies)
 
+# Start from an empty session. The SQLite file is thrown away each run, but
+# Redis is not, so without this a previous run's students would still be here.
+post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))
+
 second = post("/quiz/admin/login", json={"password": PASSWORD}).json()["token"]
 
 check("admin endpoint without a token -> 401", get("/quiz/admin/questions").status_code == 401)
@@ -251,6 +255,44 @@ check("the new order survived the restart", [q["id"] for q in questions(TOKEN)] 
 check("the same token still works after a restart (JWT_SECRET is fixed)",
       get("/quiz/admin/questions", headers=bearer(TOKEN)).status_code == 200)
 
+# ---- the per-question timer ----------------------------------------------
+print("\n-- the countdown timer")
+timed = questions(TOKEN)[0]
+body = {"type": timed["type"], "prompt": timed["prompt"], "options": timed["options"],
+        "correct_index": timed["correct_index"], "pie": timed["pie"], "compare_with": None,
+        "seconds": 2}
+requests.put(BASE + f"/quiz/admin/question/{timed['id']}", json=body, headers=bearer(TOKEN))
+check("a timer is saved on the question",
+      [q for q in questions(TOKEN) if q["id"] == timed["id"]][0]["seconds"] == 2)
+
+racer = post("/quiz/join", json={"name": "Quick", "semester": "1st"}).json()
+post(f"/quiz/admin/launch/{timed['id']}", headers=bearer(TOKEN))
+state = get("/quiz/state").json()
+check("launching starts the clock", state["seconds_left"] in (1, 2) and state["accepting"],
+      str(state["seconds_left"]))
+r = post("/quiz/answer", json={"student_id": racer["student_id"], "question_id": timed["id"],
+                               "answer": 0})
+check("answers land while the clock runs", r.status_code == 200, r.text)
+
+time.sleep(2.6)
+state = get("/quiz/state").json()
+check("the clock runs out", state["seconds_left"] == 0 and not state["accepting"])
+late = post("/quiz/answer", json={"student_id": racer["student_id"], "question_id": timed["id"],
+                                  "answer": 1})
+check("a late answer is refused with 409", late.status_code == 409, late.text)
+check("the question stays open for discussion", state["open_question"]["id"] == timed["id"])
+check("the results are still there after time is up",
+      sum(state["results"]["counts"]) == 1, str(state["results"]))
+
+post(f"/quiz/admin/launch/{timed['id']}", headers=bearer(TOKEN))
+check("relaunching restarts the clock", get("/quiz/state").json()["accepting"])
+
+untimed = [q for q in questions(TOKEN) if not q["seconds"]][0]
+post(f"/quiz/admin/launch/{untimed['id']}", headers=bearer(TOKEN))
+state = get("/quiz/state").json()
+check("a question with no timer has no deadline",
+      state["seconds_left"] is None and state["accepting"])
+
 # ---- pages ---------------------------------------------------------------
 print("\n-- pages")
 check("student page renders", "PULSE" in get("/quiz").text)
@@ -265,6 +307,7 @@ check("QR renders as SVG", svg.headers["content-type"].startswith("image/svg") a
       svg.text.startswith("<svg"))
 check("/docs is available", get("/docs").status_code == 200)
 
+post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))   # leave nothing behind
 stop()
 print(f"\n  {passed} passed, {failed} failed\n")
 sys.exit(1 if failed else 0)
