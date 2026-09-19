@@ -15,13 +15,19 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .card{background:var(--card);border-radius:16px;padding:20px}
 .mut{color:var(--mut)}
 button{font-family:inherit;cursor:pointer;border:none;border-radius:12px}
-/* left:50% leaves only half the screen to lay out in, so the text would wrap and
-   sit ragged. nowrap keeps it on one line and translateX re-centres the pill. */
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:var(--grn);
-  color:#07240f;font-weight:800;padding:14px 26px;border-radius:999px;font-size:19px;
-  white-space:nowrap;text-align:center;max-width:calc(100vw - 24px);
-  opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
-.toast.show{opacity:1}
+/* Centred with left:0/right:0/margin:auto rather than left:50%, which would only
+   give the pill the right half of the screen to lay out in and wrap the text.
+   width:max-content sizes it to the words, so it can never wrap. */
+.toast{position:fixed;left:0;right:0;bottom:26px;margin:0 auto;
+  width:max-content;max-width:calc(100% - 32px);
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  background:var(--grn);color:#07240f;font-weight:800;white-space:nowrap;
+  padding:13px 24px;border-radius:999px;font-size:18px;letter-spacing:.2px;
+  box-shadow:0 10px 28px rgba(0,0,0,.45);
+  opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;
+  pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:none}
+.toast .tick{font-size:20px;line-height:1}
 """
 
 # --------------------------------------------------------------------------
@@ -75,7 +81,7 @@ textarea{min-height:130px;resize:vertical}
   <div id="waiting" class="card center"></div>
   <div id="qbox"></div>
 </section>
-<div class="toast" id="toast">&#10003; answer received</div>
+<div class="toast" id="toast"><span class="tick">&#10003;</span><span>answer received</span></div>
 <script>
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
