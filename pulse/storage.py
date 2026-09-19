@@ -87,7 +87,8 @@ CREATE TABLE IF NOT EXISTS questions (
 # Inserted once, the very first time pulse.db is created.
 # compare_with here means "the question at this position".
 SEED = [
-    ("choice", "Which semester are you in?", ["1st", "3rd", "Other"], None, 1, None),
+    ("choice", "Which semester are you in?",
+     ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"], None, 1, None),
     ("scale", "How confident are you explaining what an AI agent is?", [], None, 0, None),
     ("text", "In one line: what is AI?", [], None, 0, None),
     ("choice", "How does an AI model actually work?",

@@ -311,8 +311,8 @@ def clean(body: QuestionBody):
     if not prompt:
         raise HTTPException(400, "The question needs a prompt")
     options = [o.strip() for o in body.options if o.strip()] if body.type == "choice" else []
-    if body.type == "choice" and not 2 <= len(options) <= 5:
-        raise HTTPException(400, "A choice question needs between 2 and 5 options")
+    if body.type == "choice" and not 2 <= len(options) <= 8:
+        raise HTTPException(400, "A choice question needs between 2 and 8 options")
     correct = body.correct_index
     if body.type != "choice" or correct is None or not 0 <= correct < len(options):
         correct = None
@@ -427,9 +427,15 @@ def roster():
     for sid in sids:
         pipe.hgetall(k_student(sid))
     students = [s for s in pipe.execute() if s]
-    by_semester = {"1st": 0, "3rd": 0, "Other": 0}
+    # Count whatever semesters actually showed up, in a sensible order.
+    order = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "Other"]
+    counts = {}
     for s in students:
-        by_semester[s.get("semester") if s.get("semester") in by_semester else "Other"] += 1
+        name = s.get("semester") or "Other"
+        counts[name] = counts.get(name, 0) + 1
+    by_semester = {name: counts[name] for name in order if name in counts}
+    for name in sorted(counts):                 # anything unexpected still gets shown
+        by_semester.setdefault(name, counts[name])
     return {"joined": len(students), "by_semester": by_semester,
             "students": [{"name": s.get("name", ""), "semester": s.get("semester", ""),
                           "joined_at": s.get("joined_at", "")} for s in students]}

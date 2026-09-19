@@ -143,8 +143,9 @@ for student, choice in zip(students, [0, 0, 1]):
     post("/quiz/answer", json={"student_id": student["student_id"], "question_id": q1,
                                "answer": choice})
 state = get("/quiz/state").json()
-check("choice counts are 2 / 1 / 0", state["results"]["counts"] == [2, 1, 0],
-      str(state["results"]))
+counts = state["results"]["counts"]
+check("choice counts are 2 / 1 / 0, and nothing else was picked",
+      counts[:3] == [2, 1, 0] and sum(counts) == 3, str(counts))
 check("answered = 3", state["answered"] == 3)
 
 r = post("/quiz/answer", json={"student_id": students[0]["student_id"], "question_id": q2,

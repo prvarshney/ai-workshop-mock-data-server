@@ -59,7 +59,7 @@ textarea{min-height:130px;resize:vertical}
   <label for="name">Your name</label>
   <input id="name" maxlength="60" autocomplete="name" placeholder="e.g. Aarav Sharma">
   <label for="sem">Semester</label>
-  <select id="sem"><option>1st</option><option>3rd</option><option>Other</option></select>
+  <select id="sem"><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>5th</option><option>6th</option><option>7th</option><option>8th</option><option>Other</option></select>
   <label for="email">Email <span class="mut">(optional)</span></label>
   <input id="email" type="email" maxlength="120" inputmode="email" placeholder="you@example.com">
   <button class="primary" id="joinbtn">Join</button>
@@ -210,7 +210,7 @@ footer{display:flex;justify-content:space-between;font-size:30px;color:var(--mut
 <footer><div id="answered"></div><div id="joined"></div></footer>
 <script>
 const JOIN_URL = "__JOIN_URL__";
-const COLORS = ["#5AD1FF","#4ADE80","#F87171","#FBBF24","#A78BFA"];
+const COLORS = ["#5AD1FF","#4ADE80","#F87171","#FBBF24","#A78BFA","#F472B6","#2DD4BF","#FB923C"];
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const stage = document.getElementById("stage");
@@ -220,8 +220,9 @@ let seen = new Set();         // which text answers have already animated in
 function pct(n, total){ return total ? Math.round(n * 100 / total) : 0; }
 
 function buildBars(labels){
+  const tight = labels.length > 5 ? " sc" : "";   // 8 options only fit at the smaller size
   stage.innerHTML = labels.map((l, i) =>
-    '<div class="row" data-i="' + i + '"><div class="rowtop"><span>' + esc(l) +
+    '<div class="row' + tight + '" data-i="' + i + '"><div class="rowtop"><span>' + esc(l) +
     '</span><span class="n"></span></div><div class="track"><div class="fill"></div></div></div>').join("");
 }
 function paintBars(counts, reveal, correct){
@@ -378,6 +379,9 @@ button.on{background:var(--grn);color:#07240f}
 .big{width:100%;margin-top:8px;padding:12px;font-size:15px}
 .stat{display:flex;gap:10px;margin-bottom:14px}
 .stat div{flex:1;background:#1E1E1E;border-radius:10px;padding:10px;text-align:center}
+.semsplit{flex-wrap:wrap}
+.semsplit div{flex:0 0 auto;min-width:62px;padding:7px 10px}
+.semsplit b{font-size:20px}
 .stat b{display:block;font-size:26px;color:var(--acc)}
 .stat span{font-size:12px;color:var(--mut)}
 #names{max-height:280px;overflow-y:auto;font-size:14px;
@@ -416,12 +420,8 @@ textarea{min-height:70px;resize:vertical}
   </div>
   <div class="right card">
     <h2>Roster</h2>
-    <div class="stat">
-      <div><b id="n1">0</b><span>1st sem</span></div>
-      <div><b id="n3">0</b><span>3rd sem</span></div>
-      <div><b id="no">0</b><span>Other</span></div>
-    </div>
     <div class="stat"><div><b id="njoined">0</b><span>students joined</span></div></div>
+    <div class="stat semsplit" id="semsplit"></div>
     <div id="names"></div>
     <button class="big" onclick="location.href='/quiz/export'">Export answers (CSV)</button>
     <button class="big warn" onclick="reset('answers')">Reset answers</button>
@@ -456,9 +456,10 @@ async function load(){
     open ? "Open now: " + open.prompt : "Nothing open - students see the waiting screen";
   const r = await (await api("/quiz/admin/roster")).json();
   document.getElementById("njoined").textContent = r.joined;
-  document.getElementById("n1").textContent = r.by_semester["1st"];
-  document.getElementById("n3").textContent = r.by_semester["3rd"];
-  document.getElementById("no").textContent = r.by_semester["Other"];
+  const sems = Object.entries(r.by_semester).filter(([, n]) => n > 0);
+  document.getElementById("semsplit").innerHTML = sems.length
+    ? sems.map(([name, n]) => "<div><b>" + n + "</b><span>" + esc(name) + "</span></div>").join("")
+    : '<div class="mut" style="text-align:left">no one yet</div>';
   document.getElementById("names").innerHTML =
     r.students.map(s => "<div>" + esc(s.name) + ' <span class="mut">' + esc(s.semester) +
                         "</span></div>").join("") || '<div class="mut">nobody yet</div>';
@@ -527,7 +528,7 @@ function editor(id){
    '<label>Type</label><select id="e_type">' +
      ["choice","text","scale"].map(t => '<option' + (t === q.type ? " selected" : "") + ">" + t +
      "</option>").join("") + "</select>" +
-   '<div id="choicebits"><label>Options (one per line, 2 to 5)</label>' +
+   '<div id="choicebits"><label>Options (one per line, 2 to 8)</label>' +
    '<textarea id="e_options">' + esc(q.options.join("\\n")) + "</textarea>" +
    '<label>Correct answer</label><select id="e_correct"></select>' +
    '<div class="chk"><input type="checkbox" id="e_pie"' + (q.pie ? " checked" : "") +
