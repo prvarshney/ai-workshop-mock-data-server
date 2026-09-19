@@ -62,7 +62,10 @@ textarea{min-height:130px;resize:vertical}
 .scale{display:flex;gap:10px}
 .scale .opt{text-align:center;padding:24px 0;font-size:26px}
 .scalelab{display:flex;justify-content:space-between;color:var(--mut);font-size:15px;margin-top:8px}
-#clock{font-size:20px;font-weight:800;color:var(--acc);margin-bottom:14px}
+#clock{font-size:20px;font-weight:800;color:var(--acc);margin-bottom:14px;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;min-height:24px}
+/* the time sits in a fixed-width slot, so "left to answer" never slides */
+#clock .num{display:inline-block;min-width:96px}
 #clock.low{color:var(--red)}
 #clock.up{color:var(--red)}
 .locked .opt,.locked textarea,.locked .primary{opacity:.45;pointer-events:none}
@@ -139,6 +142,14 @@ function lock(){
   c.hidden = false; c.className = "up"; c.textContent = "Time is up - answers closed";
 }
 
+function clock(n){
+  if (n >= 60){
+    const m = Math.floor(n / 60), sec = n % 60;
+    return sec ? m + "m " + sec + "s" : m + "m";
+  }
+  return n + "s";
+}
+
 let ticker = null;
 function startClock(left){
   clearInterval(ticker);
@@ -148,7 +159,7 @@ function startClock(left){
   const paint = () => {
     if (n <= 0){ lock(); clearInterval(ticker); return; }
     c.hidden = false; c.className = n <= 10 ? "low" : "";
-    c.textContent = n + "s left to answer";
+    c.innerHTML = '<span class="num">' + clock(n) + "</span> left to answer";
     n -= 1;
   };
   paint();
@@ -229,12 +240,14 @@ body{height:100vh;overflow:hidden;padding:24px 28px;display:flex}
 .side[hidden]{display:none}
 .head{display:flex;align-items:flex-start;gap:22px;margin:0 0 22px}
 #prompt{font-size:50px;font-weight:800;line-height:1.2;margin:0;flex:1;min-width:0}
-#timer{flex:0 0 auto;font-size:54px;font-weight:800;color:var(--acc);
-  background:#1E1E1E;border-radius:16px;padding:8px 20px;line-height:1.1;
-  font-variant-numeric:tabular-nums;text-align:center}
-#timer small{display:block;font-size:15px;color:var(--mut);letter-spacing:1px;font-weight:600}
+/* fixed width and tabular figures, so the prompt never shifts as digits change */
+#timer{flex:0 0 auto;width:250px;font-size:52px;font-weight:800;color:var(--acc);
+  background:#1E1E1E;border-radius:16px;padding:10px 16px;line-height:1.1;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;text-align:center}
+#timer small{display:block;font-size:14px;color:var(--mut);letter-spacing:1.5px;font-weight:600;
+  margin-top:2px}
 #timer.low{color:var(--red);animation:pulse 1s infinite}
-#timer.up{color:var(--red);font-size:34px;padding:16px 20px}
+#timer.up{color:var(--red);font-size:32px;padding:20px 16px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 #stage{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
 /* the answer wall is the one result that can outgrow the screen, so it scrolls */
@@ -294,8 +307,8 @@ footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut
 @media (max-height:820px){
   #prompt{font-size:38px}
   .head{margin-bottom:14px;gap:16px}
-  #timer{font-size:40px;padding:6px 15px}#timer small{font-size:12px}
-  #timer.up{font-size:26px;padding:12px 15px}
+  #timer{width:190px;font-size:38px;padding:8px 12px}#timer small{font-size:11px}
+  #timer.up{font-size:24px;padding:16px 12px}
   .rowtop{font-size:24px}.track{height:30px}.row{margin-bottom:13px}
   .row.sc{margin-bottom:8px}.sc .rowtop{font-size:20px}.sc .track{height:24px}
   .cmphead{font-size:21px;min-height:21px}
@@ -391,6 +404,16 @@ function scaleBlock(title, counts, average){
     }).join("") + '<div class="avg">' + average.toFixed(1) + "<span>AVERAGE</span></div></div>";
 }
 
+// 95 -> "1m 35s", 45 -> "45s". Keeps the wording steady instead of counting
+// down through three-digit second counts.
+function clock(n){
+  if (n >= 60){
+    const m = Math.floor(n / 60), sec = n % 60;
+    return sec ? m + "m " + sec + "s" : m + "m";
+  }
+  return n + "s";
+}
+
 let ticker = null, lastLeft = null;
 // The countdown ticks locally between polls so it moves every second, not
 // every 1.5. When it hits zero the results stay up - only answering stops.
@@ -404,7 +427,7 @@ function startTimer(left){
     if (n <= 0){ t.className = "up"; t.innerHTML = "TIME UP<small>ANSWERS CLOSED</small>";
                  clearInterval(ticker); return; }
     t.className = n <= 10 ? "low" : "";
-    t.innerHTML = n + "<small>SECONDS LEFT</small>";
+    t.innerHTML = clock(n) + "<small>LEFT TO ANSWER</small>";
     n -= 1;
   };
   paint();
@@ -644,7 +667,11 @@ async function load(){
   const open = QS.find(q => q.open);
   let label = open ? "Open now: " + open.prompt : "Nothing open - students see the waiting screen";
   if (open && d.seconds_left !== null)
-    label += d.accepting ? "   (" + d.seconds_left + "s left)" : "   (time up - answers closed)";
+    label += d.accepting
+      ? "   (" + (d.seconds_left >= 60
+          ? Math.floor(d.seconds_left / 60) + "m " + (d.seconds_left % 60) + "s"
+          : d.seconds_left + "s") + " left)"
+      : "   (time up - answers closed)";
   document.getElementById("openlbl").textContent = label;
   const r = await (await api("/quiz/admin/roster")).json();
   document.getElementById("njoined").textContent = r.joined;

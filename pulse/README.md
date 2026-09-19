@@ -131,7 +131,9 @@ to compare against. Everything saves straight to `pulse.db`.
 
 Set **Timer (seconds after launch)** on a question and the countdown starts the
 moment you hit Launch. It shows big on the projector next to the prompt, and on
-every phone as "23s left to answer".
+every phone as "1m 30s left to answer". Anything over a minute is written as
+minutes and seconds, and both sit in a fixed-width slot so the prompt and the
+wording never shift as the digits change.
 
 When it reaches zero the phones stop accepting answers — buttons grey out and a
 late submission is refused — but **the question stays on the projector** with
