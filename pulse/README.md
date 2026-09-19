@@ -118,6 +118,11 @@ incoming connections on port 8000.
 4. **Close** puts the phones back to the waiting screen.
 5. **Launch fresh** re-runs a question after clearing its old answers.
 
+Students get a **Log out** button in the corner of their page. It only forgets
+them on that phone, so they can rejoin under a different name — useful for a
+typo, or a handset being passed around. Answers they already sent stay with you,
+and rejoining without an email address counts as a new student on the roster.
+
 The question editor takes prompt, type, options (one per line), the correct
 answer, whether to draw a donut, and which earlier scale question to compare
 against. Everything saves straight to `pulse.db`.
