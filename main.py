@@ -35,11 +35,15 @@ LAN_IP = pulse_app.LAN_IP
 app = mock_server.app                   # reuse SkyBook's app: CORS and the request log
 app.title = "AI Agents Workshop API"
 app.description = (
-    "One service for the workshop. SkyBook (flights, bookings, weather) is what\n"
-    "the students' agents call; the quiz endpoints drive the phones and the\n"
-    "projector. Everything below is served by one process on one port."
+    "The API the students' agents call: flights, bookings and weather.\n\n"
+    "The live quiz runs on the same service under /quiz, but its endpoints are\n"
+    "left out of these docs on purpose - they drive the phones and the projector,\n"
+    "not anybody's agent."
 )
-app.include_router(pulse_app.router, prefix="/quiz")
+# include_in_schema=False keeps the quiz endpoints out of /docs. The docs are
+# projected during the lecture and should show only the API the students' agents
+# call; the quiz drives the phones and the projector, not their code.
+app.include_router(pulse_app.router, prefix="/quiz", include_in_schema=False)
 
 INDEX = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -73,7 +77,7 @@ footer{margin-top:34px;color:#8B93AD;font-size:16px}
   <a class="tile" href="/dashboard"><b>SkyBook &mdash; live bookings</b>
     <span>What the students' agents are booking<br><code>/dashboard</code></span></a>
   <a class="tile" href="/docs"><b>API docs</b>
-    <span>Swagger for SkyBook and Pulse together<br><code>/docs</code></span></a>
+    <span>The flight API the agents call<br><code>/docs</code></span></a>
   <a class="tile" href="/health"><b>Health check</b>
     <span>Is it up, and which storage is it using<br><code>/health</code></span></a>
 </div>

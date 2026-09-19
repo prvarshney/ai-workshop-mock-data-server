@@ -46,7 +46,7 @@ You will see something like:
 | `/quiz` | students, on their phones |
 | `/quiz/screen` | the projector — shows the QR code until you launch something |
 | `/quiz/admin` | you, on the laptop (asks for the password) |
-| `/docs` | Swagger, if you want to show the API live |
+| `/docs` | Swagger. Running the whole workshop app leaves the quiz endpoints out of it on purpose; `SOLO=1 python pulse.py` shows them |
 
 **Open `/quiz/screen` only after you are on the venue Wi-Fi.** The QR code is
 built from the laptop's LAN IP, and that address changes with the network.

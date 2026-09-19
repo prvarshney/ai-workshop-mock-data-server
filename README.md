@@ -43,7 +43,7 @@ One process, one port, one address to write on the board:
 | `/quiz/screen` | **Pulse** — the projector: QR code, then live results |
 | `/quiz/admin` | **Pulse** — your control panel (asks for the password) |
 | `/dashboard` | **SkyBook** — live bookings from the students' agents |
-| `/docs` | Swagger for both APIs together |
+| `/docs` | Swagger for the flight API the agents call (the quiz endpoints are deliberately left out) |
 | `/health` | Is it up, and which storage it is using |
 
 Change the port with `PORT=8080 python main.py`.

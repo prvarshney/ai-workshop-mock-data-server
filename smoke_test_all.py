@@ -57,8 +57,13 @@ check("/quiz is Pulse", "PULSE" in requests.get(BASE + "/quiz").text)
 check("/quiz/screen is the projector", "Scan to join" in requests.get(BASE + "/quiz/screen").text)
 check("/health still answers", requests.get(BASE + "/health").json()["status"] == "ok")
 openapi = requests.get(BASE + "/openapi.json").json()["paths"]
-check("/docs covers SkyBook and Pulse",
-      "/flights" in openapi and "/quiz/join" in openapi, str(len(openapi)) + " paths")
+check("/docs covers the flight API", "/flights" in openapi and "/bookings" in openapi,
+      str(len(openapi)) + " paths")
+check("/docs deliberately leaves the quiz endpoints out",
+      not [p for p in openapi if p.startswith("/quiz")],
+      str([p for p in openapi if p.startswith("/quiz")]))
+check("but the quiz endpoints still work",
+      requests.get(BASE + "/quiz/state", timeout=10).status_code == 200)
 
 # ---- the join QR must point at the port we are really serving on ------------
 screen = requests.get(BASE + "/quiz/screen").text
