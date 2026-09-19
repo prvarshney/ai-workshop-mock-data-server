@@ -15,8 +15,11 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .card{background:var(--card);border-radius:16px;padding:20px}
 .mut{color:var(--mut)}
 button{font-family:inherit;cursor:pointer;border:none;border-radius:12px}
+/* left:50% leaves only half the screen to lay out in, so the text would wrap and
+   sit ragged. nowrap keeps it on one line and translateX re-centres the pill. */
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:var(--grn);
   color:#07240f;font-weight:800;padding:14px 26px;border-radius:999px;font-size:19px;
+  white-space:nowrap;text-align:center;max-width:calc(100vw - 24px);
   opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}
 """
