@@ -118,11 +118,11 @@ incoming connections on port 8000.
 4. **Close** puts the phones back to the waiting screen.
 5. **Launch fresh** re-runs a question after clearing its old answers.
 
-Students get a **Leave** button in the corner of their page. Leaving removes
-them from the session completely: they vanish from your roster, from both lists
-on the projector, from the tallies and from the CSV, along with anything they
-had answered. Useful for a typo in a name, or a handset being passed around.
-They can join again afterwards as a new student.
+Students get a **Leave** button in the corner of their page. It asks them to
+confirm, then signs that phone out and returns it to the join form. **Their
+answers are kept** — they stay on your roster, in the tallies and in the CSV.
+Useful when a handset is being passed around, or someone typed the wrong name
+and wants to join again.
 
 The question editor takes prompt, type, options (one per line), the correct
 answer, whether to draw a donut, a **timer**, and which earlier scale question
@@ -150,8 +150,11 @@ with both averages. That is the closing slide.
 
 ## 7. Between sessions
 
-- **Reset answers** — clears every answer, keeps the students who joined.
-- **Reset everything** — clears the students too. Start fresh with a new batch.
+- **Reset answers** — clears every answer, keeps the students who joined and
+  keeps their phones signed in.
+- **Reset everything** — clears the students too, and signs every phone out:
+  within a couple of seconds each student is back at the join form and has to
+  enter their name again. Use it between two different groups.
 - **Export answers (CSV)** — one row per answer, with names and timestamps.
 - Neither reset ever touches your questions.
 
@@ -166,7 +169,6 @@ Students (no login):
 | GET | `/quiz/state` | The open question plus live results |
 | POST | `/quiz/answer` | `{student_id, question_id, answer}` |
 | GET | `/quiz/board` | Everything the projector shows, including who answered what |
-| POST | `/quiz/leave` | `{student_id}` — remove a student and everything they answered |
 | GET | `/quiz/qr.svg` | The join QR code |
 | GET | `/quiz/screen` | The projector page |
 

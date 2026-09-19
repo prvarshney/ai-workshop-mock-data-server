@@ -36,8 +36,8 @@ from pydantic import BaseModel
 import auth
 import storage
 from auth import require_admin
-from storage import (K_OPEN, K_STUDENTS, K_UNTIL, db, k_answer, k_answers,
-                     k_email, k_reveal, k_student)
+from storage import (K_OPEN, K_SESSION, K_STUDENTS, K_UNTIL, db, k_answer,
+                     k_answers, k_email, k_reveal, k_student)
 
 PORT = int(os.environ.get("PORT", "8000"))   # same variable main.py uses
 
@@ -81,6 +81,16 @@ def current_question():
 
 def forget_cache():
     _open_cache["qid"] = _open_cache["question"] = None
+
+
+def session_id():
+    """An id for this session. "Reset everything" gives out a new one, which is
+    how every phone knows to drop its student and show the join form again."""
+    current = db.get(K_SESSION)
+    if not current:
+        current = uuid.uuid4().hex[:8]
+        db.set(K_SESSION, current)
+    return current
 
 
 def countdown():
@@ -185,37 +195,15 @@ def join(body: JoinBody):
     if email:                                   # same email twice = same student
         existing = db.get(k_email(email))
         if existing and db.exists(k_student(existing)):
-            return {"student_id": existing, "name": db.hget(k_student(existing), "name")}
+            return {"student_id": existing, "name": db.hget(k_student(existing), "name"),
+                    "session": session_id()}
     sid = uuid.uuid4().hex[:12]
     db.hset(k_student(sid), mapping={"name": name, "semester": body.semester or "Other",
                                      "email": email, "joined_at": storage.now_iso()})
     db.lpush(K_STUDENTS, sid)
     if email:
         db.set(k_email(email), sid)
-    return {"student_id": sid, "name": name}
-
-
-class LeaveBody(BaseModel):
-    student_id: str = ""
-
-
-@router.post("/leave", tags=["quiz"])
-def leave(body: LeaveBody):
-    """Take a student out of the session completely - they disappear from the
-    roster, the projector and the CSV, along with anything they answered."""
-    sid = str(body.student_id or "")
-    student = db.hgetall(k_student(sid))
-    if not student:
-        return {"ok": True, "removed": False}      # already gone; nothing to do
-    for key in list(db.scan_iter(match=f"pulse:answer:*:{sid}", count=500)):
-        db.delete(key)                             # their answers
-    for key in list(db.scan_iter(match="pulse:answers:*", count=500)):
-        db.zrem(key, sid)                          # and their place in each tally
-    if student.get("email"):
-        db.delete(k_email(student["email"]))
-    db.lrem(K_STUDENTS, 0, sid)
-    db.delete(k_student(sid))
-    return {"ok": True, "removed": True}
+    return {"student_id": sid, "name": name, "session": session_id()}
 
 
 @router.get("/state", tags=["quiz"])
@@ -225,8 +213,9 @@ def state():
     question = current_question()
     joined = db.llen(K_STUDENTS)
     if not question:
-        return {"open_question": None, "joined": joined, "answered": 0,
-                "results": None, "compare": None, "seconds_left": None, "accepting": True}
+        return {"open_question": None, "joined": joined, "answered": 0, "results": None,
+                "compare": None, "seconds_left": None, "accepting": True,
+                "session": session_id()}
 
     reveal = bool(db.exists(k_reveal(question["id"])))
     shown = {"id": question["id"], "type": question["type"], "prompt": question["prompt"],
@@ -243,7 +232,8 @@ def state():
     return {"open_question": shown, "joined": joined,
             "answered": db.zcard(k_answers(question["id"])),
             "results": tally(question), "compare": compare,
-            "seconds_left": seconds_left, "accepting": accepting}
+            "seconds_left": seconds_left, "accepting": accepting,
+            "session": session_id()}
 
 
 @router.post("/answer", tags=["quiz"])
@@ -501,8 +491,10 @@ def reset(scope: str = "answers"):
     if scope not in ("answers", "all"):
         raise HTTPException(400, "scope must be answers or all")
     storage.clear_redis(everything=(scope == "all"))
+    if scope == "all":
+        db.set(K_SESSION, uuid.uuid4().hex[:8])   # every phone drops its student
     forget_cache()
-    return {"ok": True, "scope": scope}
+    return {"ok": True, "scope": scope, "session": session_id()}
 
 
 @router.get("/admin/roster", dependencies=ADMIN, tags=["quiz admin"])

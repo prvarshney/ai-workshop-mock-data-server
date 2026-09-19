@@ -46,6 +46,7 @@ db, STORAGE = _connect_redis()
 # with other apps, and so a reset never deletes anything that is not ours.
 K_OPEN = "pulse:open"
 K_UNTIL = "pulse:open_until"     # epoch seconds; after this, answers are refused
+K_SESSION = "pulse:session"      # changes on "reset everything" so phones log out
 K_STUDENTS = "pulse:students"
 
 
@@ -60,7 +61,8 @@ def clear_redis(everything: bool) -> None:
     """Delete our keys. everything=False keeps the students who already joined."""
     patterns = ["pulse:answer:*", "pulse:answers:*", "pulse:reveal:*", K_OPEN, K_UNTIL]
     if everything:
-        patterns += ["pulse:student:*", "pulse:email:*", K_STUDENTS, "pulse:login_attempts:*"]
+        patterns += ["pulse:student:*", "pulse:email:*", K_STUDENTS,
+                     "pulse:login_attempts:*", K_SESSION]
     for pattern in patterns:
         keys = list(db.scan_iter(match=pattern, count=500)) if "*" in pattern else [pattern]
         if keys:

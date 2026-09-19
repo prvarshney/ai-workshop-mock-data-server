@@ -115,6 +115,7 @@ document.getElementById("joinbtn").onclick = async () => {
   const d = await r.json();
   sid = d.student_id; myName = d.name;
   localStorage.setItem("pulse_sid", sid); localStorage.setItem("pulse_name", myName);
+  if (d.session) localStorage.setItem("pulse_session", d.session);
   showLive();
 };
 
@@ -197,6 +198,11 @@ function draw(q){
 async function tick(){
   try {
     const d = await (await fetch("/quiz/state")).json();
+    // The instructor pressed "Reset everything": this student no longer exists,
+    // so drop everything and go back to the join form.
+    const known = localStorage.getItem("pulse_session");
+    if (d.session && !known) localStorage.setItem("pulse_session", d.session);
+    else if (d.session && known !== d.session){ forget(); return; }
     const q = d.open_question;
     if (!q){ shownKey = ""; shownId = null;
              clearInterval(ticker);
@@ -214,14 +220,17 @@ async function tick(){
   } catch (e) { /* server busy - try again next tick */ }
 }
 
-document.getElementById("leave").onclick = async () => {
-  if (!confirm("Leave the session? You will be removed from the list, along with "
-             + "anything you have answered. You can join again afterwards.")) return;
-  // Tell the server first, so the instructor stops seeing this student at all.
-  try { await fetch("/quiz/leave", {method:"POST", headers:{"Content-Type":"application/json"},
-                                    body: JSON.stringify({student_id: sid})}); } catch (e) {}
+// Leave signs this phone out. The answers already sent are kept, so the
+// instructor still has them.
+function forget(){
   Object.keys(localStorage).filter(k => k.startsWith("pulse_")).forEach(k => localStorage.removeItem(k));
   location.reload();
+}
+
+document.getElementById("leave").onclick = () => {
+  if (!confirm("Leave the session?\\n\\nYour answers are saved and stay with the "
+             + "instructor. You can join again on this phone whenever you like.")) return;
+  forget();
 };
 
 if (sid) showLive();
@@ -721,7 +730,10 @@ async function del(id){
   await api("/quiz/admin/question/" + id, {method: "DELETE"}); sig = ""; load();
 }
 async function reset(scope){
-  const msg = scope === "all" ? "Remove every student AND every answer?" : "Clear every answer?";
+  const msg = scope === "all"
+    ? "Remove every student AND every answer?\\n\\nEvery phone will be signed out and "
+      + "students will have to join again."
+    : "Clear every answer? Students stay joined.";
   if (!confirm(msg)) return;
   await api("/quiz/admin/reset?scope=" + scope, {method: "POST"}); sig = ""; load();
 }
