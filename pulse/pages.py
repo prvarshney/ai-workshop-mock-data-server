@@ -41,8 +41,8 @@ body{padding:18px;font-size:18px}
 h1{font-size:26px;margin:0 0 16px}
 header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 header .logo{font-size:20px;font-weight:800;color:var(--acc);letter-spacing:.5px}
-#leave{padding:9px 16px;font-size:15px;font-weight:700;background:#3A3F52;color:var(--mut)}
-#leave:hover{color:var(--txt)}
+#leave{padding:9px 18px;font-size:15px;font-weight:700;background:#3A3F52;color:var(--mut)}
+#leave:hover{background:#4A2530;color:var(--red)}
 label{display:block;margin:14px 0 6px;font-size:17px;color:var(--mut)}
 input,select,textarea{width:100%;padding:15px;font-size:19px;border-radius:12px;border:2px solid #3A3F52;
   background:#1E1E1E;color:var(--txt);font-family:inherit}
@@ -72,7 +72,7 @@ textarea{min-height:130px;resize:vertical}
 .in{animation:slide .35s ease-out}
 @keyframes slide{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
 </style></head><body>
-<header><span class="logo">&#9679; PULSE</span><button id="leave" hidden>Log out</button></header>
+<header><span class="logo">&#9679; PULSE</span><button id="leave" hidden>Leave</button></header>
 <section id="join" class="card">
   <h1>Join the session</h1>
   <label for="name">Your name</label>
@@ -214,9 +214,12 @@ async function tick(){
   } catch (e) { /* server busy - try again next tick */ }
 }
 
-document.getElementById("leave").onclick = () => {
-  if (!confirm("Log out of Pulse on this phone? You can join again with a different name.")) return;
-  // Only clears this device. Answers already sent stay with the instructor.
+document.getElementById("leave").onclick = async () => {
+  if (!confirm("Leave the session? You will be removed from the list, along with "
+             + "anything you have answered. You can join again afterwards.")) return;
+  // Tell the server first, so the instructor stops seeing this student at all.
+  try { await fetch("/quiz/leave", {method:"POST", headers:{"Content-Type":"application/json"},
+                                    body: JSON.stringify({student_id: sid})}); } catch (e) {}
   Object.keys(localStorage).filter(k => k.startsWith("pulse_")).forEach(k => localStorage.removeItem(k));
   location.reload();
 };

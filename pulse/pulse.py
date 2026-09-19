@@ -195,6 +195,29 @@ def join(body: JoinBody):
     return {"student_id": sid, "name": name}
 
 
+class LeaveBody(BaseModel):
+    student_id: str = ""
+
+
+@router.post("/leave", tags=["quiz"])
+def leave(body: LeaveBody):
+    """Take a student out of the session completely - they disappear from the
+    roster, the projector and the CSV, along with anything they answered."""
+    sid = str(body.student_id or "")
+    student = db.hgetall(k_student(sid))
+    if not student:
+        return {"ok": True, "removed": False}      # already gone; nothing to do
+    for key in list(db.scan_iter(match=f"pulse:answer:*:{sid}", count=500)):
+        db.delete(key)                             # their answers
+    for key in list(db.scan_iter(match="pulse:answers:*", count=500)):
+        db.zrem(key, sid)                          # and their place in each tally
+    if student.get("email"):
+        db.delete(k_email(student["email"]))
+    db.lrem(K_STUDENTS, 0, sid)
+    db.delete(k_student(sid))
+    return {"ok": True, "removed": True}
+
+
 @router.get("/state", tags=["quiz"])
 def state():
     """What every phone and the projector poll. Students are told about the

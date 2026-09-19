@@ -293,9 +293,49 @@ state = get("/quiz/state").json()
 check("a question with no timer has no deadline",
       state["seconds_left"] is None and state["accepting"])
 
+# ---- leaving the session -------------------------------------------------
+print("\n-- a student leaving")
+post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))
+leaver = post("/quiz/join", json={"name": "Goner", "semester": "1st",
+                                  "email": "goner@example.com"}).json()
+stayer = post("/quiz/join", json={"name": "Stayer", "semester": "3rd"}).json()
+timedq = questions(TOKEN)[0]
+body["seconds"] = 0                                   # no clock in the way
+requests.put(BASE + f"/quiz/admin/question/{timedq['id']}", json=body, headers=bearer(TOKEN))
+post(f"/quiz/admin/launch/{timedq['id']}", headers=bearer(TOKEN))
+for who in (leaver, stayer):
+    post("/quiz/answer", json={"student_id": who["student_id"], "question_id": timedq["id"],
+                               "answer": 0})
+check("both answers counted before anyone leaves", get("/quiz/state").json()["answered"] == 2)
+
+r = post("/quiz/leave", json={"student_id": leaver["student_id"]})
+check("POST /quiz/leave removes them", r.json()["removed"] is True, r.text)
+state, boarded = get("/quiz/state").json(), get("/quiz/board").json()
+check("they are off the roster", state["joined"] == 1)
+check("their answer is off the tally", state["answered"] == 1 and sum(state["results"]["counts"]) == 1,
+      str(state["results"]))
+names = [x["name"] for x in boarded["answered_by"]] + boarded["waiting"]
+check("their name is gone from the projector", "Goner" not in names, str(names))
+check("they are gone from the admin roster",
+      "Goner" not in [s["name"] for s in get("/quiz/admin/roster", headers=bearer(TOKEN)).json()["students"]])
+rows = [ln for ln in get("/quiz/export", headers=bearer(TOKEN)).text.strip().splitlines()[1:] if ln]
+check("their answer is gone from the CSV", not any(ln.startswith("Goner") for ln in rows), str(rows))
+check("the student who stayed is untouched",
+      "Stayer" in [x["name"] for x in boarded["answered_by"]])
+
+check("leaving twice is harmless",
+      post("/quiz/leave", json={"student_id": leaver["student_id"]}).json()["removed"] is False)
+rejoin = post("/quiz/join", json={"name": "Goner", "semester": "1st",
+                                  "email": "goner@example.com"}).json()
+check("the freed email gives a fresh student id",
+      rejoin["student_id"] != leaver["student_id"])
+
 # ---- pages ---------------------------------------------------------------
 print("\n-- pages")
-check("student page renders", "PULSE" in get("/quiz").text)
+student_page = get("/quiz").text
+check("student page renders", "PULSE" in student_page)
+check("the student button says Leave, not Log out",
+      ">Leave</button>" in student_page and "Log out" not in student_page)
 check("screen page renders", "Scan to join" in get("/quiz/screen").text)
 check("admin page shows the login box when logged out",
       "Instructor login" in get("/quiz/admin").text)

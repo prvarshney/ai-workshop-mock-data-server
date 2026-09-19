@@ -118,10 +118,11 @@ incoming connections on port 8000.
 4. **Close** puts the phones back to the waiting screen.
 5. **Launch fresh** re-runs a question after clearing its old answers.
 
-Students get a **Log out** button in the corner of their page. It only forgets
-them on that phone, so they can rejoin under a different name — useful for a
-typo, or a handset being passed around. Answers they already sent stay with you,
-and rejoining without an email address counts as a new student on the roster.
+Students get a **Leave** button in the corner of their page. Leaving removes
+them from the session completely: they vanish from your roster, from both lists
+on the projector, from the tallies and from the CSV, along with anything they
+had answered. Useful for a typo in a name, or a handset being passed around.
+They can join again afterwards as a new student.
 
 The question editor takes prompt, type, options (one per line), the correct
 answer, whether to draw a donut, a **timer**, and which earlier scale question
@@ -165,6 +166,7 @@ Students (no login):
 | GET | `/quiz/state` | The open question plus live results |
 | POST | `/quiz/answer` | `{student_id, question_id, answer}` |
 | GET | `/quiz/board` | Everything the projector shows, including who answered what |
+| POST | `/quiz/leave` | `{student_id}` — remove a student and everything they answered |
 | GET | `/quiz/qr.svg` | The join QR code |
 | GET | `/quiz/screen` | The projector page |
 
