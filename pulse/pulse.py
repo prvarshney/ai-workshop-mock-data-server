@@ -207,15 +207,20 @@ def join(body: JoinBody):
 
 
 @router.get("/state", tags=["quiz"])
-def state():
+def state(student_id: Optional[str] = None):
     """What every phone and the projector poll. Students are told about the
-    open question and nothing else."""
+    open question and nothing else.
+
+    A phone passes its student_id so we can tell it when that student has gone -
+    after "reset everything", say. One EXISTS lookup, which is cheap enough to
+    do on every poll."""
     question = current_question()
     joined = db.llen(K_STUDENTS)
+    known = bool(db.exists(k_student(student_id))) if student_id else None
     if not question:
         return {"open_question": None, "joined": joined, "answered": 0, "results": None,
                 "compare": None, "seconds_left": None, "accepting": True,
-                "session": session_id()}
+                "session": session_id(), "you_exist": known}
 
     reveal = bool(db.exists(k_reveal(question["id"])))
     shown = {"id": question["id"], "type": question["type"], "prompt": question["prompt"],
@@ -233,7 +238,7 @@ def state():
             "answered": db.zcard(k_answers(question["id"])),
             "results": tally(question), "compare": compare,
             "seconds_left": seconds_left, "accepting": accepting,
-            "session": session_id()}
+            "session": session_id(), "you_exist": known}
 
 
 @router.post("/answer", tags=["quiz"])

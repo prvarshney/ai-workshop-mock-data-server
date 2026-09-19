@@ -133,6 +133,7 @@ async function send(value){
     body: JSON.stringify({student_id: sid, question_id: shownId, answer: value})});
   if (r.ok) { localStorage.setItem("pulse_a_" + shownId, String(value)); toast(); }
   else if (r.status === 409) { lock(); toast("&#9203; time is up"); }
+  else if (r.status === 404) { forget(); }      // we were reset away; start over
 }
 
 // When the clock runs out the question stays on screen, it just stops taking
@@ -197,7 +198,10 @@ function draw(q){
 
 async function tick(){
   try {
-    const d = await (await fetch("/quiz/state")).json();
+    const d = await (await fetch("/quiz/state?student_id=" + encodeURIComponent(sid))).json();
+    // Our student no longer exists on the server - the instructor reset the
+    // session - so drop everything and show the join form.
+    if (d.you_exist === false){ forget(); return; }
     // The instructor pressed "Reset everything": this student no longer exists,
     // so drop everything and go back to the join form.
     const known = localStorage.getItem("pulse_session");

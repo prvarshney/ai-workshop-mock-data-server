@@ -323,7 +323,18 @@ stale = post("/quiz/answer", json={"student_id": joiner["student_id"],
                                    "question_id": timedq["id"], "answer": 0})
 check("a student id from before the reset no longer works",
       stale.status_code == 404, f"{stale.status_code} {stale.text}")
+
+# A phone asks about itself on every poll, so it finds out it has been reset
+# away even if it somehow holds the current session id.
+check("state says a reset-away student is gone",
+      get("/quiz/state", params={"student_id": joiner["student_id"]}).json()["you_exist"] is False)
+fresh = post("/quiz/join", json={"name": "Fresh", "semester": "1st"}).json()
+check("state says a real student is still there",
+      get("/quiz/state", params={"student_id": fresh["student_id"]}).json()["you_exist"] is True)
+check("state says nothing when no student id is sent",
+      get("/quiz/state").json()["you_exist"] is None)
 post("/quiz/admin/close", headers=bearer(TOKEN))
+post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))
 check("leaving is a phone-side action, there is no delete endpoint",
       post("/quiz/leave", json={"student_id": "x"}).status_code == 404)
 
