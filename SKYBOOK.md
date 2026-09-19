@@ -31,16 +31,16 @@ You should see:
 ```
   SkyBook mock API
   storage    : redis
-  dashboard  : http://192.168.1.41:8001/dashboard
-  swagger    : http://192.168.1.41:8001/docs
+  dashboard  : http://192.168.1.41:8000/dashboard
+  swagger    : http://192.168.1.41:8000/docs
   students use the address above (not localhost)
 ```
 
 | URL | What it is |
 | --- | --- |
-| `http://<your-ip>:8001/dashboard` | Live dashboard — project this |
-| `http://<your-ip>:8001/docs` | Swagger UI — click endpoints and try them live |
-| `http://<your-ip>:8001/health` | Quick "is it up?" check |
+| `http://<your-ip>:8000/dashboard` | Live dashboard — project this |
+| `http://<your-ip>:8000/docs` | Swagger UI — click endpoints and try them live |
+| `http://<your-ip>:8000/health` | Quick "is it up?" check |
 
 ## 3. Redis (optional)
 
@@ -66,7 +66,7 @@ REDIS_URL=redis://localhost:6379/0 python mock_server.py
 ## 4. Tell students your IP address
 
 Everyone must be on the same Wi-Fi. `localhost` only works on your own machine,
-so give students the LAN address, e.g. `http://192.168.1.41:8001`.
+so give students the LAN address, e.g. `http://192.168.1.41:8000`.
 
 | Platform | Command |
 | --- | --- |
@@ -76,7 +76,7 @@ so give students the LAN address, e.g. `http://192.168.1.41:8001`.
 
 The server prints this address on startup too. If students cannot reach it,
 it is almost always the laptop's firewall — allow incoming connections on
-port 8001.
+port 8000.
 
 ## 5. Endpoints
 
@@ -104,19 +104,19 @@ Goa, Jaipur, Pune, Lucknow, Ahmedabad. City names are case-insensitive, so
 ### Try it from the terminal
 
 ```bash
-curl "http://localhost:8001/flights?source=Chandigarh&destination=Goa"
+curl "http://localhost:8000/flights?source=Chandigarh&destination=Goa"
 
-curl -X POST http://localhost:8001/bookings \
+curl -X POST http://localhost:8000/bookings \
   -H "Content-Type: application/json" \
   -d '{"flight_id":"SG723","passenger_name":"Aarav Sharma","seats":2}'
 
-curl http://localhost:8001/weather/goa
+curl http://localhost:8000/weather/goa
 ```
 
 ## 6. Between demos
 
 ```bash
-curl -X POST http://localhost:8001/reset
+curl -X POST http://localhost:8000/reset
 ```
 
 Wipes every booking, restores all seats to 500, and regenerates the same
@@ -142,7 +142,7 @@ flights and weather as before. The dashboard goes back to
 
 ```bash
 pip install requests
-python smoke_test.py                       # or: python smoke_test.py http://192.168.1.41:8001
+python smoke_test.py                       # or: python smoke_test.py http://192.168.1.41:8000
 ```
 
 26 checks covering determinism, booking, cancelling, seat restoration, error

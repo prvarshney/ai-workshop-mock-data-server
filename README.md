@@ -84,11 +84,12 @@ always the laptop firewall — allow incoming connections on the port.
 
 ## Running one app on its own
 
-Both still work alone, on their own ports:
+Rarely needed, but both still work alone. They use the same `PORT` (default
+8000), so run one at a time — or give one a different port:
 
 ```bash
-python mock_server.py     # SkyBook only, port 8001
-python pulse/pulse.py     # Pulse only,  port 8000
+python mock_server.py                # SkyBook only, on 8000
+PORT=8001 python pulse/pulse.py      # Pulse only, on 8001
 ```
 
 ## Tests

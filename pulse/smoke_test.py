@@ -26,7 +26,7 @@ TEST_DB = "/tmp/pulse_smoke.db"
 SECRET = "smoke-test-secret-value-32-bytes-long"
 PASSWORD = "cu2026"
 
-ENV = dict(os.environ, PULSE_PORT=str(PORT), PULSE_DB=TEST_DB, JWT_SECRET=SECRET,
+ENV = dict(os.environ, PORT=str(PORT), PULSE_DB=TEST_DB, JWT_SECRET=SECRET,
            ADMIN_PASSWORD=PASSWORD, REDIS_URL=os.environ.get("SMOKE_REDIS_URL",
                                                              "redis://localhost:6379/15"))
 passed = failed = 0

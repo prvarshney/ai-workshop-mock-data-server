@@ -2,8 +2,10 @@
 SkyBook - a tiny mock flight-booking API for the AI Agents workshop.
 
 Run it with:  python mock_server.py
-Then open:    http://localhost:8001/        (live dashboard)
-              http://localhost:8001/docs    (Swagger, try the API by hand)
+Then open:    http://localhost:8000/dashboard   (live dashboard)
+              http://localhost:8000/docs        (Swagger, try the API by hand)
+
+Runs on PORT (default 8000) - the same variable main.py and Pulse use.
 
 Everything is stored in Redis. If Redis is not running we quietly fall back to
 "fakeredis", an in-memory stand-in with the same commands, so the server always
@@ -30,6 +32,7 @@ from pydantic import BaseModel
 # --------------------------------------------------------------------------
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+PORT = int(os.environ.get("PORT", "8000"))   # one port for the whole workshop app
 
 
 def connect_storage():
@@ -539,7 +542,7 @@ if __name__ == "__main__":
         lan_ip = "localhost"
     print("\n  SkyBook mock API"
           f"\n  storage    : {STORAGE}"
-          f"\n  dashboard  : http://{lan_ip}:8001/dashboard"
-          f"\n  swagger    : http://{lan_ip}:8001/docs"
+          f"\n  dashboard  : http://{lan_ip}:{PORT}/dashboard"
+          f"\n  swagger    : http://{lan_ip}:{PORT}/docs"
           "\n  students use the address above (not localhost)\n", flush=True)
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")

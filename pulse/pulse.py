@@ -39,7 +39,7 @@ from auth import require_admin
 from storage import (K_OPEN, K_STUDENTS, db, k_answer, k_answers, k_email,
                      k_reveal, k_student)
 
-PORT = int(os.environ.get("PULSE_PORT", "8000"))
+PORT = int(os.environ.get("PORT", "8000"))   # same variable main.py uses
 
 
 def find_lan_ip():

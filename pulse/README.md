@@ -73,7 +73,7 @@ On Windows PowerShell, use `$env:ADMIN_PASSWORD="..."` instead of `export`.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `PULSE_PORT` | `8000` | Port to listen on |
+| `PORT` | `8000` | Port to listen on |
 | `REDIS_URL` | `redis://localhost:6379/0` | Where the live state goes |
 | `ADMIN_PASSWORD` | `cu2026` | The instructor password |
 | `JWT_SECRET` | random each start | Signs the login token |

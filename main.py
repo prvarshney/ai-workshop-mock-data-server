@@ -25,7 +25,7 @@ import pulse.pulse as pulse_app         # Pulse: exposes a router we can mount
 import pulse.auth as pulse_auth
 import pulse.storage as pulse_storage
 
-PORT = int(os.environ.get("PORT", os.environ.get("PULSE_PORT", "8000")))
+PORT = int(os.environ.get("PORT", "8000"))
 
 # Pulse builds its join QR code from its own port number. We are serving it on
 # OUR port, so tell it the truth - otherwise every scanned QR points nowhere.
