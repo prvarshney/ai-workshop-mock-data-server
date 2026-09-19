@@ -348,11 +348,20 @@ function showQR(){
 
 // Right column. Long answers are cut with an ellipsis; hover shows the full text
 // as a tooltip and clicking the row expands it in place.
+// Redraw a list but stay where the instructor scrolled to, instead of snapping
+// back to the top every 1.5 seconds.
+function fill(id, html){
+  const box = document.getElementById(id);
+  const top = box.scrollTop;
+  box.innerHTML = html;
+  box.scrollTop = top;
+}
+
 function drawSide(d){
   const a = d.answered_by || [], w = d.waiting || [];
   document.getElementById("acount").textContent = a.length;
   document.getElementById("wcount").textContent = w.length;
-  document.getElementById("alist").innerHTML = a.length
+  fill("alist", a.length
     ? a.map(x => {
         const key = x.name + "|" + x.answer;
         const cls = (opened.has(key) ? " open" : "") + (seenWho.has(key) ? "" : " new2");
@@ -361,10 +370,10 @@ function drawSide(d){
                esc(x.name + " — " + x.answer) + '"><span class="nm">' + esc(x.name) +
                '</span><span class="an">' + esc(x.answer) + "</span></div>";
       }).join("")
-    : '<div class="empty2">nobody yet</div>';
-  document.getElementById("wlist").innerHTML = w.length
+    : '<div class="empty2">nobody yet</div>');
+  fill("wlist", w.length
     ? w.map(n => '<span class="wait">' + esc(n) + "</span>").join("")
-    : '<div class="empty2">everyone has answered</div>';
+    : '<div class="empty2">everyone has answered</div>');
   document.querySelectorAll("#alist .who2").forEach(el => el.onclick = () => {
     const k = el.dataset.k;
     if (opened.has(k)) opened.delete(k); else opened.add(k);
