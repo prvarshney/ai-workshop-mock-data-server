@@ -189,7 +189,11 @@ body{height:100vh;overflow:hidden;padding:24px 28px;display:flex}
 .side[hidden]{display:none}
 #prompt{font-size:50px;font-weight:800;line-height:1.2;margin:0 0 22px}
 #stage{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
-#stage.top{justify-content:flex-start}
+/* the answer wall is the one result that can outgrow the screen, so it scrolls */
+#stage.top{justify-content:flex-start;overflow-y:auto;padding-right:8px;
+  scrollbar-width:thin;scrollbar-color:#4A5168 transparent}
+#stage.top::-webkit-scrollbar{width:10px}
+#stage.top::-webkit-scrollbar-thumb{background:#4A5168;border-radius:5px}
 .qr{display:flex;align-items:center;justify-content:center;gap:60px;height:100%}
 .qr img{background:#fff;padding:18px;border-radius:20px;width:520px;height:520px}
 .qr .join{font-size:34px;color:var(--mut)}
@@ -406,12 +410,14 @@ async function tick(){
     } else {
       if (key !== builtKey){ builtKey = key; seen = new Set(); stage.innerHTML = '<div class="wall"></div>'; }
       const wall = stage.querySelector(".wall");
+      const wallTop = stage.scrollTop;                 // redrawing would jump to the top
       wall.innerHTML = d.results.answers.map(a => {
         const id = a.name + "|" + a.answer, fresh = seen.has(id) ? "" : " new";
         seen.add(id);
         return '<div class="a' + fresh + '"><div class="who">' + esc(a.name) +
                '</div><div class="txt">' + esc(a.answer) + "</div></div>";
       }).join("");
+      stage.scrollTop = wallTop;
     }
     drawSide(d);
   } catch (e) { /* try again next tick */ }
