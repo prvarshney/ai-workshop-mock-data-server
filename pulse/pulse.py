@@ -167,7 +167,7 @@ class AnswerBody(BaseModel):
     answer: Any
 
 
-@router.post("/join")
+@router.post("/join", tags=["quiz"])
 def join(body: JoinBody):
     name = (body.name or "").strip()[:60]
     if not name:
@@ -186,7 +186,7 @@ def join(body: JoinBody):
     return {"student_id": sid, "name": name}
 
 
-@router.get("/state")
+@router.get("/state", tags=["quiz"])
 def state():
     """What every phone and the projector poll. Students are told about the
     open question and nothing else."""
@@ -212,7 +212,7 @@ def state():
             "results": tally(question), "compare": compare}
 
 
-@router.post("/answer")
+@router.post("/answer", tags=["quiz"])
 def answer(body: AnswerBody):
     question = current_question()
     if not question or str(question["id"]) != str(body.question_id):
@@ -245,7 +245,7 @@ def answer(body: AnswerBody):
     return {"ok": True}
 
 
-@router.get("/qr.svg")
+@router.get("/qr.svg", tags=["quiz"])
 def qr(request: Request):
     return Response(qr_svg(join_url(request)), media_type="image/svg+xml")
 
@@ -258,7 +258,7 @@ class LoginBody(BaseModel):
     password: str = ""
 
 
-@router.post("/admin/login")
+@router.post("/admin/login", tags=["quiz"])
 def login(body: LoginBody, request: Request):
     ip = request.client.host if request.client else "unknown"
     if auth.locked_out(ip):
@@ -274,7 +274,7 @@ def login(body: LoginBody, request: Request):
     return reply
 
 
-@router.post("/admin/logout")
+@router.post("/admin/logout", tags=["quiz"])
 def logout(request: Request):
     claims = auth.read_claims(request)
     if claims:
@@ -321,7 +321,7 @@ def clean(body: QuestionBody):
             "compare_with": body.compare_with if body.type == "scale" else None}
 
 
-@router.get("/admin/questions", dependencies=ADMIN)
+@router.get("/admin/questions", dependencies=ADMIN, tags=["quiz admin"])
 def admin_questions():
     questions = storage.list_questions()
     open_raw = db.get(K_OPEN)
@@ -333,12 +333,12 @@ def admin_questions():
     return {"questions": questions, "open": open_id}
 
 
-@router.post("/admin/question", dependencies=ADMIN)
+@router.post("/admin/question", dependencies=ADMIN, tags=["quiz admin"])
 def create_question(body: QuestionBody):
     return {"id": storage.save_question(None, clean(body))}
 
 
-@router.put("/admin/question/{qid}", dependencies=ADMIN)
+@router.put("/admin/question/{qid}", dependencies=ADMIN, tags=["quiz admin"])
 def edit_question(qid: int, body: QuestionBody):
     before = storage.get_question(qid)
     if not before:
@@ -353,7 +353,7 @@ def edit_question(qid: int, body: QuestionBody):
     return {"id": qid, "cleared_answers": cleared}
 
 
-@router.delete("/admin/question/{qid}", dependencies=ADMIN)
+@router.delete("/admin/question/{qid}", dependencies=ADMIN, tags=["quiz admin"])
 def delete_question(qid: int):
     if not storage.get_question(qid):
         raise HTTPException(404, "No such question")
@@ -364,7 +364,7 @@ def delete_question(qid: int):
     return {"ok": True}
 
 
-@router.post("/admin/question/{qid}/move", dependencies=ADMIN)
+@router.post("/admin/question/{qid}/move", dependencies=ADMIN, tags=["quiz admin"])
 def move_question(qid: int, body: MoveBody):
     questions = storage.list_questions()
     order = [q["id"] for q in questions]
@@ -379,7 +379,7 @@ def move_question(qid: int, body: MoveBody):
     return {"order": order}
 
 
-@router.post("/admin/launch/{qid}", dependencies=ADMIN)
+@router.post("/admin/launch/{qid}", dependencies=ADMIN, tags=["quiz admin"])
 def launch(qid: int, fresh: int = 0):
     if not storage.get_question(qid):
         raise HTTPException(404, "No such question")
@@ -390,14 +390,14 @@ def launch(qid: int, fresh: int = 0):
     return {"ok": True, "open": qid}
 
 
-@router.post("/admin/close", dependencies=ADMIN)
+@router.post("/admin/close", dependencies=ADMIN, tags=["quiz admin"])
 def close():
     db.delete(K_OPEN)
     forget_cache()
     return {"ok": True}
 
 
-@router.post("/admin/reveal/{qid}", dependencies=ADMIN)
+@router.post("/admin/reveal/{qid}", dependencies=ADMIN, tags=["quiz admin"])
 def reveal(qid: int):
     question = storage.get_question(qid)
     if not question:
@@ -411,7 +411,7 @@ def reveal(qid: int):
     return {"reveal": True}
 
 
-@router.post("/admin/reset", dependencies=ADMIN)
+@router.post("/admin/reset", dependencies=ADMIN, tags=["quiz admin"])
 def reset(scope: str = "answers"):
     if scope not in ("answers", "all"):
         raise HTTPException(400, "scope must be answers or all")
@@ -420,7 +420,7 @@ def reset(scope: str = "answers"):
     return {"ok": True, "scope": scope}
 
 
-@router.get("/admin/roster", dependencies=ADMIN)
+@router.get("/admin/roster", dependencies=ADMIN, tags=["quiz admin"])
 def roster():
     sids = db.lrange(K_STUDENTS, 0, -1)
     pipe = db.pipeline()
@@ -435,12 +435,12 @@ def roster():
                           "joined_at": s.get("joined_at", "")} for s in students]}
 
 
-@router.get("/admin/questions/export", dependencies=ADMIN)
+@router.get("/admin/questions/export", dependencies=ADMIN, tags=["quiz admin"])
 def export_questions():
     return {"questions": storage.list_questions()}
 
 
-@router.post("/admin/questions/import", dependencies=ADMIN)
+@router.post("/admin/questions/import", dependencies=ADMIN, tags=["quiz admin"])
 def import_questions(payload: Any):
     items = payload.get("questions") if isinstance(payload, dict) else payload
     if not isinstance(items, list) or not items:
@@ -454,7 +454,7 @@ def import_questions(payload: Any):
     return {"imported": len(cleaned)}
 
 
-@router.get("/export", dependencies=ADMIN)
+@router.get("/export", dependencies=ADMIN, tags=["quiz admin"])
 def export_csv():
     """One row per answer, for the instructor to keep."""
     out = io.StringIO()

@@ -33,7 +33,12 @@ pulse_app.PORT = PORT
 LAN_IP = pulse_app.LAN_IP
 
 app = mock_server.app                   # reuse SkyBook's app: CORS and the request log
-app.title = "Workshop - SkyBook + Pulse"
+app.title = "AI Agents Workshop API"
+app.description = (
+    "One service for the workshop. SkyBook (flights, bookings, weather) is what\n"
+    "the students' agents call; the quiz endpoints drive the phones and the\n"
+    "projector. Everything below is served by one process on one port."
+)
 app.include_router(pulse_app.router, prefix="/quiz")
 
 INDEX = """<!doctype html><html><head><meta charset="utf-8">
@@ -87,17 +92,18 @@ if __name__ == "__main__":
     where = LAN_IP or "localhost"
     secret = ("from JWT_SECRET" if pulse_auth.SECRET_FROM_ENV
               else "generated now (set JWT_SECRET to stay logged in across restarts)")
-    print(f"\n  AI Agents Workshop - SkyBook + Pulse"
-          f"\n  skybook storage : {mock_server.STORAGE}"
-          f"\n  pulse storage   : {pulse_storage.STORAGE}"
-          f"\n  questions       : {pulse_storage.DB_PATH}"
-          f"\n  jwt secret      : {secret}"
-          + ("" if pulse_auth.SECRET_FROM_ENV else f"\n                    JWT_SECRET={pulse_auth.JWT_SECRET}")
+    both = mock_server.STORAGE if mock_server.STORAGE == pulse_storage.STORAGE else \
+        f"{mock_server.STORAGE} (flights) + {pulse_storage.STORAGE} (quiz)"
+    print(f"\n  AI Agents Workshop  -  one service on port {PORT}"
+          f"\n  storage    : {both}"
+          f"\n  questions  : {pulse_storage.DB_PATH}"
+          f"\n  jwt secret : {secret}"
+          + ("" if pulse_auth.SECRET_FROM_ENV else f"\n               JWT_SECRET={pulse_auth.JWT_SECRET}")
           + f"\n\n  index      : http://{where}:{PORT}/"
           f"\n  students   : http://{where}:{PORT}/quiz"
           f"\n  projector  : http://{where}:{PORT}/quiz/screen"
           f"\n  instructor : http://{where}:{PORT}/quiz/admin"
-          f"\n  skybook    : http://{where}:{PORT}/dashboard"
+          f"\n  bookings   : http://{where}:{PORT}/dashboard"
           f"\n  api docs   : http://{where}:{PORT}/docs"
           f"\n\n  students use the address above, not localhost\n", flush=True)
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")

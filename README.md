@@ -1,12 +1,16 @@
 # AI Agents Workshop — Chandigarh University
 
-Two apps for a 3-hour workshop, both running on the instructor's laptop, both
-working with no internet at all.
+**One service, one port, one process** — started with a single command and
+working with no internet at all. It does two jobs:
 
-| | What it is |
+| | What it does |
 | --- | --- |
-| **Pulse** | A live quiz. Students join from their phones with a QR code; you launch questions and the results land on the projector. |
-| **SkyBook** | A mock flight-booking API. Students point their own LLM agents at it, and every booking appears on a live dashboard. |
+| **Quiz** (`/quiz`) | Students join from their phones with a QR code; you launch questions and the results land on the projector. |
+| **Flights** (`/dashboard`) | A mock flight-booking API. Students point their own LLM agents at it, and every booking appears on a live dashboard. |
+
+They share one port, one `/docs`, one Redis connection and one startup command.
+The code is split across files only to keep each one readable — `mock_server.py`
+for flights, `pulse/` for the quiz — but at runtime it is a single service.
 
 ---
 

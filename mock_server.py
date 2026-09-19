@@ -364,7 +364,7 @@ def clear_skybook():
     db.delete("bookings:all", "log", "seeded")
 
 
-@app.post("/reset", tags=["admin"])
+@app.post("/reset", tags=["skybook admin"])
 def reset():
     """Wipe every booking and put all the seats back. Use between demos."""
     clear_skybook()
