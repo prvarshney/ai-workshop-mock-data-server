@@ -18,6 +18,7 @@ import os
 import random
 import socket
 import string
+import sys
 from datetime import datetime
 from typing import Any, Optional
 
@@ -530,6 +531,14 @@ setInterval(refresh, 1500);
 # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # The workshop normally runs SkyBook and Pulse together on one port, so hand
+    # over to main.py. Set SOLO=1 if you really want SkyBook by itself.
+    _main = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py")
+    if not os.environ.get("SOLO") and os.path.exists(_main):
+        print("Starting the whole workshop app (SkyBook + Pulse) via main.py."
+              "\n  SOLO=1 python mock_server.py  runs SkyBook on its own.", flush=True)
+        os.execv(sys.executable, [sys.executable, _main])
+
     # Only when SkyBook runs on its own - main.py serves its own index page here.
     app.get("/", include_in_schema=False)(lambda: RedirectResponse("/dashboard"))
 

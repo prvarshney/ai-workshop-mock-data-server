@@ -519,6 +519,13 @@ def home():
 
 
 if __name__ == "__main__":
+    # Same idea as SkyBook: by default start the whole workshop app.
+    _main = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+    if not os.environ.get("SOLO") and os.path.exists(_main):
+        print("Starting the whole workshop app (SkyBook + Pulse) via main.py."
+              "\n  SOLO=1 python pulse/pulse.py  runs Pulse on its own.", flush=True)
+        os.execv(sys.executable, [sys.executable, _main])
+
     where = LAN_IP or "localhost"
     print(f"\n  Pulse"
           f"\n  storage    : {storage.STORAGE}"

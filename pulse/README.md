@@ -22,8 +22,8 @@ Python 3.10 or newer (3.9 also works).
 python pulse.py
 ```
 
-Or run Pulse and SkyBook together on one port with `python main.py`
-from the repo root (see the [project README](../README.md)). Everything below
+`python pulse.py` actually starts **both** Pulse and SkyBook, by handing over
+to `main.py` in the folder above — use `SOLO=1 python pulse.py` for Pulse alone (see the [project README](../README.md)). Everything below
 applies either way; only the port changes.
 
 You will see something like:

@@ -22,8 +22,9 @@ Python 3.10 or newer (3.9 also works).
 python mock_server.py
 ```
 
-To run SkyBook and Pulse together on one port instead, use
-`python main.py` from the repo root — see the [project README](README.md).
+`python mock_server.py` actually starts **both** SkyBook and Pulse, by handing
+over to `main.py` — use `SOLO=1 python mock_server.py` for SkyBook alone. See
+the [project README](README.md) — see the [project README](README.md).
 This file covers SkyBook on its own.
 
 You should see:

@@ -17,6 +17,10 @@ pip install -r requirements.txt
 python main.py
 ```
 
+`python mock_server.py` and `python pulse/pulse.py` do the same thing — each
+hands over to `main.py`, so whichever file you run, you get both apps. There is
+no way to accidentally start half the workshop.
+
 One process, one port, one address to write on the board:
 
 ```
@@ -84,13 +88,15 @@ always the laptop firewall — allow incoming connections on the port.
 
 ## Running one app on its own
 
-Rarely needed, but both still work alone. They use the same `PORT` (default
-8000), so run one at a time — or give one a different port:
+Rarely needed. Set `SOLO=1` to stop the hand-over to `main.py`:
 
 ```bash
-python mock_server.py                # SkyBook only, on 8000
-PORT=8001 python pulse/pulse.py      # Pulse only, on 8001
+SOLO=1 python mock_server.py             # SkyBook only  (no /quiz)
+SOLO=1 python pulse/pulse.py             # Pulse only    (no /dashboard)
+SOLO=1 PORT=8001 python pulse/pulse.py   # ...on another port
 ```
+
+Without `SOLO`, both files start the full app on `PORT` (default 8000).
 
 ## Tests
 
