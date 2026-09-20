@@ -18,6 +18,19 @@ for flights, `pulse/` for the quiz — but at runtime it is a single service.
 
 ```bash
 pip install -r requirements.txt
+./start.sh                 # Windows: start.bat
+```
+
+The first run writes a `.env` next to the script with a freshly generated
+`JWT_SECRET`. **Open it and change `ADMIN_PASSWORD`** — that is the only setting
+you really must edit. `.env` is gitignored, so your password stays out of the
+repo.
+
+`start.sh` loads `.env`, checks the packages are installed, refuses to start if
+the port is already busy, and then runs `main.py`. To skip it and run the server
+directly:
+
+```bash
 python main.py
 ```
 
@@ -53,15 +66,25 @@ built from the laptop's LAN IP, which changes with the network.
 
 ## Before the session
 
-```bash
-export ADMIN_PASSWORD="something-only-you-know"
-export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-python main.py
+Edit `.env`:
+
+```ini
+ADMIN_PASSWORD=something-only-you-know
+JWT_SECRET=<generated for you on first run - keep it>
+JWT_HOURS=12
+PORT=8000
+REDIS_URL=redis://localhost:6379/0
 ```
 
 The Pulse admin password defaults to `cu2026` — change it, because students can
-reach the admin page too. Setting `JWT_SECRET` means restarting the server does
-not log you out. On Windows PowerShell use `$env:ADMIN_PASSWORD="..."`.
+reach the admin page too. `start.sh` warns you while it is still the default.
+Keeping `JWT_SECRET` fixed means restarting the server does not log you out.
+
+Prefer environment variables? They still work, and they win over `.env`:
+
+```bash
+ADMIN_PASSWORD="..." PORT=9000 python main.py
+```
 
 ## Redis is optional
 
@@ -118,7 +141,9 @@ disturb a live session — except `smoke_test.py`, which calls SkyBook's
 
 | File | What it is |
 | --- | --- |
-| `main.py` | Runs both apps together on one port — **start here** |
+| `start.sh` / `start.bat` | Loads `.env` and starts the server — **start here** |
+| `.env` | Your password, signing secret and port. Created on first run, gitignored |
+| `main.py` | Runs both apps together on one port |
 | `mock_server.py` | SkyBook: the flight API and its dashboard |
 | `pulse/` | Pulse: the quiz app (`pulse.py`, `pages.py`, `storage.py`, `auth.py`) |
 | `pulse/pulse.db` | The question bank — your content, committed to the repo |
