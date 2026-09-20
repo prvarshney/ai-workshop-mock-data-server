@@ -69,6 +69,8 @@ textarea{min-height:130px;resize:vertical}
 #clock.low{color:var(--red)}
 #clock.up{color:var(--red)}
 .locked .opt,.locked textarea,.locked .primary{opacity:.45;pointer-events:none}
+.locked .opt.on{opacity:1;border-color:var(--grn);background:#0C2F1B;color:var(--grn)}
+#lockmsg{font-size:19px;font-weight:800;color:var(--grn);margin-bottom:14px}
 .in{animation:slide .35s ease-out}
 @keyframes slide{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
 </style></head><body>
@@ -87,6 +89,7 @@ textarea{min-height:130px;resize:vertical}
 <section id="live" hidden>
   <div id="waiting" class="card center"></div>
   <div id="clock" hidden></div>
+  <div id="lockmsg" hidden>&#9889; answer locked in</div>
   <div id="qbox"></div>
 </section>
 <div class="toast" id="toast"><span class="tick">&#10003;</span><span>answer received</span></div>
@@ -129,11 +132,28 @@ function showLive(){
 }
 
 async function send(value){
+  if (locked) return;                            // one shot on a race question
   const r = await fetch("/quiz/answer", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({student_id: sid, question_id: shownId, answer: value})});
-  if (r.ok) { localStorage.setItem("pulse_a_" + shownId, String(value)); toast(); }
-  else if (r.status === 409) { lock(); toast("&#9203; time is up"); }
+  if (r.ok) {
+    localStorage.setItem("pulse_a_" + shownId, String(value));
+    if (isRace) { lockIn(); toast("&#9889; answer locked in"); } else toast();
+  }
+  else if (r.status === 409) {
+    // Either the clock ran out, or this is a race and we have already answered.
+    let why = ""; try { why = (await r.json()).detail || ""; } catch (e) {}
+    if (why.indexOf("locked") >= 0) { lockIn(); toast("&#9889; answer locked in"); }
+    else { lock(); toast("&#9203; time is up"); }
+  }
   else if (r.status === 404) { forget(); }      // we were reset away; start over
+}
+
+// Fastest finger first: the first tap is final, so grey the options out and
+// leave the chosen one lit.
+function lockIn(){
+  locked = true;
+  document.getElementById("qbox").classList.add("locked");
+  document.getElementById("lockmsg").hidden = false;
 }
 
 // When the clock runs out the question stays on screen, it just stops taking
@@ -170,6 +190,8 @@ function startClock(left){
 
 let shownId = null;
 let lastLeft = null;
+let isRace = false;      // is the open question a fastest-finger race?
+let locked = false;      // have we already used our one shot?
 function draw(q){
   const mine = localStorage.getItem("pulse_a_" + q.id);
   let html = '<div class="card qcard in"><div class="prompt">' + esc(q.prompt) + "</div>";
@@ -185,6 +207,10 @@ function draw(q){
             '</textarea><button class="primary" id="send">Submit</button>';
   document.getElementById("qbox").innerHTML = html + "</div>";
   document.getElementById("qbox").classList.remove("locked");
+  document.getElementById("lockmsg").hidden = true;
+  // A refresh must not hand out a second go.
+  isRace = !!q.fastest; locked = false;
+  if (isRace && mine !== null) lockIn();
 
   document.querySelectorAll(".opt").forEach(b => b.onclick = () => {
     document.querySelectorAll(".opt").forEach(x => x.classList.remove("on"));
@@ -208,9 +234,10 @@ async function tick(){
     if (d.session && !known) localStorage.setItem("pulse_session", d.session);
     else if (d.session && known !== d.session){ forget(); return; }
     const q = d.open_question;
-    if (!q){ shownKey = ""; shownId = null;
+    if (!q){ shownKey = ""; shownId = null; isRace = false; locked = false;
              clearInterval(ticker);
              document.getElementById("clock").hidden = true;
+             document.getElementById("lockmsg").hidden = true;
              document.getElementById("qbox").innerHTML = "";
              document.getElementById("waiting").hidden = false; return; }
     document.getElementById("waiting").hidden = true;
@@ -296,6 +323,20 @@ body{height:100vh;overflow:hidden;padding:24px 28px;display:flex}
 .cmphead{font-size:26px;color:var(--mut);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;min-height:26px}
 .avg{font-size:58px;font-weight:800;color:var(--acc);text-align:center;margin-top:6px}
 .avg span{font-size:22px;color:var(--mut);display:block;font-weight:600;letter-spacing:1px}
+/* fastest finger first - only drawn once the instructor reveals */
+#podium{background:var(--card);border-radius:18px;padding:16px 22px;margin-bottom:18px;
+  border:2px solid #C9A227;animation:pop .5s ease-out}
+#podium h2{font-size:20px;color:#E8C64A;margin:0 0 10px;letter-spacing:2px;text-transform:uppercase}
+#podium .w{display:flex;align-items:baseline;gap:16px;padding:5px 0}
+#podium .rank{flex:0 0 42px;font-size:26px;font-weight:800;color:var(--mut);text-align:center}
+#podium .nm{flex:1;min-width:0;font-size:30px;font-weight:800;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#podium .t{flex:0 0 auto;font-size:26px;font-weight:800;color:var(--acc);
+  font-variant-numeric:tabular-nums}
+#podium .w.first .rank{color:#E8C64A;font-size:34px}
+#podium .w.first .nm{font-size:44px;color:#E8C64A}
+#podium .w.first .t{font-size:34px;color:#E8C64A}
+#podium .none{font-size:26px;color:var(--mut);padding:6px 0}
 footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut);padding-top:14px}
 
 /* the right-hand column: answered on top, still waiting underneath */
@@ -325,6 +366,11 @@ footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut
   .head{margin-bottom:14px;gap:16px}
   #timer{width:190px;font-size:38px;padding:8px 12px}#timer small{font-size:11px}
   #timer.up{font-size:24px;padding:16px 12px}
+  #podium{padding:12px 16px;margin-bottom:12px}
+  #podium h2{font-size:16px;margin-bottom:6px}
+  #podium .nm{font-size:23px}#podium .t{font-size:20px}#podium .rank{font-size:20px}
+  #podium .w.first .nm{font-size:33px}#podium .w.first .t{font-size:26px}
+  #podium .w.first .rank{font-size:26px}
   .rowtop{font-size:24px}.track{height:30px}.row{margin-bottom:13px}
   .row.sc{margin-bottom:8px}.sc .rowtop{font-size:20px}.sc .track{height:24px}
   .cmphead{font-size:21px;min-height:21px}
@@ -342,6 +388,7 @@ footer{display:flex;justify-content:space-between;font-size:26px;color:var(--mut
 <div class="screen">
   <div class="main full" id="main">
     <div class="head"><h1 id="prompt"></h1><div id="timer" hidden></div></div>
+    <div id="podium" hidden></div>
     <div id="stage"></div>
     <footer><div id="answered"></div><div id="joined"></div></footer>
   </div>
@@ -450,8 +497,22 @@ function startTimer(left){
   ticker = setInterval(paint, 1000);
 }
 
+const MEDALS = ["\u0031", "\u0032", "\u0033"];
+function drawPodium(list){
+  const box = document.getElementById("podium");
+  if (!list){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = "<h2>&#127942; Fastest finger first</h2>" + (list.length
+    ? list.map((w, i) =>
+        '<div class="w' + (i ? "" : " first") + '"><span class="rank">' + (i + 1) +
+        '</span><span class="nm">' + esc(w.name) + '</span><span class="t">' +
+        (w.seconds === null ? "" : w.seconds.toFixed(1) + "s") + "</span></div>").join("")
+    : '<div class="none">nobody got it right</div>');
+}
+
 function showQR(){
   clearInterval(ticker);
+  document.getElementById("podium").hidden = true;
   document.getElementById("timer").hidden = true;
   side.hidden = true; main.classList.add("full");
   if (builtKey === "qr") return;
@@ -513,6 +574,7 @@ async function tick(){
     lastLeft = d.seconds_left;
     const key = q.id + "|" + q.type + "|" + q.pie + "|" + q.options.join("~") + "|" + !!d.compare;
 
+    drawPodium(d.podium);
     if (q.type === "choice"){
       if (key !== builtKey){ builtKey = key; q.pie ? buildDonut(q.options) : buildBars(q.options); }
       q.pie ? paintDonut(d.results.counts)
@@ -704,7 +766,8 @@ function drawList(){
   document.getElementById("qs").innerHTML = QS.map((q, i) =>
     '<div class="q' + (q.open ? " live" : "") + '"><div class="qmain">' +
       '<div class="qp">' + (i + 1) + ". " + esc(q.prompt) + "</div>" +
-      '<div class="qmeta">' + q.type + (q.seconds ? " &middot; " + q.seconds + "s timer" : "") +
+      '<div class="qmeta">' + q.type + (q.fastest ? " &middot; \u26a1 fastest finger" : "") +
+      (q.seconds ? " &middot; " + q.seconds + "s timer" : "") +
       ' &middot; <span id="c' + q.id + '">' + q.answers +
       " answers</span></div></div><div class=\\"qbtns\\">" +
       '<button class="go" onclick="launch(' + q.id + ',0)">Launch</button>' +
@@ -771,7 +834,10 @@ function editor(id){
    '<textarea id="e_options">' + esc(q.options.join("\\n")) + "</textarea>" +
    '<label>Correct answer</label><select id="e_correct"></select>' +
    '<div class="chk"><input type="checkbox" id="e_pie"' + (q.pie ? " checked" : "") +
-   '><span>Show as a donut on the projector</span></div></div>' +
+   '><span>Show as a donut on the projector</span></div>' +
+   '<div class="chk"><input type="checkbox" id="e_fastest"' + (q.fastest ? " checked" : "") +
+   '><span>Fastest finger first &mdash; one shot each, winner shown on Reveal' +
+   '<br><small class="mut">needs a correct answer above</small></span></div></div>' +
    '<label>Timer (seconds after launch, 0 = no limit)</label>' +
    '<input id="e_secs" type="number" min="0" max="3600" value="' + (q.seconds || 0) + '">' +
    '<div id="scalebits"><label>Compare with an earlier scale question</label>' +
@@ -813,6 +879,7 @@ async function save(id, answers){
     options, correct_index: correct === "" ? null : +correct,
     pie: document.getElementById("e_pie").checked,
     seconds: +document.getElementById("e_secs").value || 0,
+    fastest: document.getElementById("e_fastest").checked,
     compare_with: document.getElementById("e_cmp").value
       ? +document.getElementById("e_cmp").value : null});
   const r = id ? await api("/quiz/admin/question/" + id, {method: "PUT", body})

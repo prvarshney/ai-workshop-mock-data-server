@@ -293,6 +293,70 @@ state = get("/quiz/state").json()
 check("a question with no timer has no deadline",
       state["seconds_left"] is None and state["accepting"])
 
+# ---- fastest finger first ------------------------------------------------
+print("\n-- fastest finger first")
+post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))
+race_id = post("/quiz/admin/question", headers=bearer(TOKEN), json={
+    "type": "choice", "prompt": "Race: which method CREATES?",
+    "options": ["GET", "POST", "PUT"], "correct_index": 1,
+    "pie": False, "compare_with": None, "seconds": 0, "fastest": True}).json()["id"]
+saved = [q for q in questions(TOKEN) if q["id"] == race_id][0]
+check("a race question is saved as one", saved["fastest"] is True)
+
+racers = {name: post("/quiz/join", json={"name": name, "semester": "1st"}).json()["student_id"]
+          for name in ("Slow", "Winner", "Wrong", "Second")}
+post(f"/quiz/admin/launch/{race_id}", headers=bearer(TOKEN))
+for name, pick in (("Wrong", 0), ("Winner", 1), ("Second", 1), ("Slow", 2)):
+    post("/quiz/answer", json={"student_id": racers[name], "question_id": race_id,
+                               "answer": pick})
+    time.sleep(0.12)                       # so the finishing order is unambiguous
+
+again = post("/quiz/answer", json={"student_id": racers["Wrong"], "question_id": race_id,
+                                   "answer": 1})
+check("one shot only - you cannot switch to the right answer", again.status_code == 409,
+      again.text)
+check("and the first answer is the one that stands",
+      get("/quiz/board").json()["results"]["counts"] == [1, 2, 1],
+      str(get("/quiz/state").json()["results"]["counts"]))
+
+check("the winner is hidden until the instructor reveals",
+      get("/quiz/state").json()["podium"] is None)
+
+post(f"/quiz/admin/reveal/{race_id}", headers=bearer(TOKEN))
+winners = get("/quiz/state").json()["podium"]
+check("revealing shows only the students who got it right",
+      [w["name"] for w in winners] == ["Winner", "Second"], str(winners))
+check("in the order they answered",
+      winners[0]["seconds"] <= winners[1]["seconds"], str(winners))
+check("timed from the moment the question was launched",
+      0 <= winners[0]["seconds"] < 30, str(winners[0]))
+check("the projector gets the podium too", get("/quiz/board").json()["podium"] == winners)
+
+post(f"/quiz/admin/launch/{race_id}?fresh=1", headers=bearer(TOKEN))
+check("launching fresh clears the race and hides the winner again",
+      get("/quiz/state").json()["podium"] is None and get("/quiz/state").json()["answered"] == 0)
+retry = post("/quiz/answer", json={"student_id": racers["Wrong"], "question_id": race_id,
+                                   "answer": 1})
+check("and everyone gets a fresh go", retry.status_code == 200, retry.text)
+
+plain_id = post("/quiz/admin/question", headers=bearer(TOKEN), json={
+    "type": "choice", "prompt": "Not a race", "options": ["A", "B"], "correct_index": 0,
+    "pie": False, "compare_with": None, "seconds": 0, "fastest": False}).json()["id"]
+post(f"/quiz/admin/launch/{plain_id}", headers=bearer(TOKEN))
+post("/quiz/answer", json={"student_id": racers["Slow"], "question_id": plain_id, "answer": 0})
+changed = post("/quiz/answer", json={"student_id": racers["Slow"], "question_id": plain_id,
+                                     "answer": 1})
+check("an ordinary question still lets students change their mind",
+      changed.status_code == 200, changed.text)
+check("and has no podium", get("/quiz/state").json()["podium"] is None)
+
+no_answer = post("/quiz/admin/question", headers=bearer(TOKEN), json={
+    "type": "choice", "prompt": "No right answer", "options": ["A", "B"],
+    "correct_index": None, "pie": False, "compare_with": None,
+    "seconds": 0, "fastest": True}).json()["id"]
+check("a race needs a right answer to race towards",
+      [q for q in questions(TOKEN) if q["id"] == no_answer][0]["fastest"] is False)
+
 # ---- signing phones out --------------------------------------------------
 print("\n-- reset everything signs the phones out")
 post("/quiz/admin/reset?scope=all", headers=bearer(TOKEN))
@@ -342,6 +406,8 @@ check("leaving is a phone-side action, there is no delete endpoint",
 print("\n-- pages")
 student_page = get("/quiz").text
 check("student page renders", "PULSE" in student_page)
+check("the student page can lock an answer in",
+      "answer locked in" in student_page)
 check("the student button says Leave",
       ">Leave</button>" in student_page and "Log out" not in student_page)
 check("leaving promises the answers are kept",

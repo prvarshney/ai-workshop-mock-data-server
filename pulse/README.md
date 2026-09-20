@@ -128,6 +128,25 @@ The question editor takes prompt, type, options (one per line), the correct
 answer, whether to draw a donut, a **timer**, and which earlier scale question
 to compare against. Everything saves straight to `pulse.db`.
 
+### Fastest finger first
+
+Tick **Fastest finger first** on a choice question that has a correct answer,
+and it becomes a race.
+
+- Each student gets **one shot** — the first tap is final, the other options
+  grey out and the phone says "⚡ answer locked in". Without that it would not
+  be a fair race: the recorded time is the moment you land on the right option,
+  so tapping through every option in turn would buy you a fast time on a guess.
+- Nothing is given away while the race runs. The bars fill as usual and the
+  winner stays hidden.
+- Press **Reveal** and the projector shows the podium: the three students who
+  picked the right option soonest, with their times, winner in gold. Times are
+  measured from the moment you pressed Launch.
+- If nobody got it right it says so.
+
+Pair it with a timer for the full game-show effect. **Launch fresh** clears the
+race so you can run it again.
+
 ### Timers
 
 Set **Timer (seconds after launch)** on a question and the countdown starts the

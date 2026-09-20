@@ -36,8 +36,8 @@ from pydantic import BaseModel
 import auth
 import storage
 from auth import require_admin
-from storage import (K_OPEN, K_SESSION, K_STUDENTS, K_UNTIL, db, k_answer,
-                     k_answers, k_email, k_reveal, k_student)
+from storage import (K_LAUNCHED, K_OPEN, K_SESSION, K_STUDENTS, K_UNTIL, db,
+                     k_answer, k_answers, k_email, k_reveal, k_student)
 
 PORT = int(os.environ.get("PORT", "8000"))   # same variable main.py uses
 
@@ -159,6 +159,43 @@ def tally(question):
     return {"answers": [{"name": n or "Someone", "answer": v} for (s, v), n in zip(shown, names)]}
 
 
+def podium(question, top=3):
+    """Fastest finger first: the students who picked the right option, soonest.
+
+    Every answer already stores the moment it arrived as its score in the
+    sorted set, so this is just a read - sort by time, keep the correct ones.
+    Times are measured from the moment the question was launched."""
+    correct = question["correct_index"]
+    if correct is None:
+        return []
+    qid = question["id"]
+    entries = db.zrange(k_answers(qid), 0, -1, withscores=True)   # earliest first
+    if not entries:
+        return []
+    values = db.mget([k_answer(qid, sid) for sid, _ in entries])
+    launched = float(db.get(K_LAUNCHED) or 0)
+
+    winners = []
+    for (sid, when), value in zip(entries, values):
+        if value is None:
+            continue
+        try:
+            picked = int(value)
+        except (TypeError, ValueError):
+            continue
+        if picked == correct:
+            winners.append((sid, when))
+            if len(winners) >= top:
+                break
+
+    names = student_names([sid for sid, _ in winners])
+    # An answer older than the launch is left over from a previous run of this
+    # question, so it has no race time - show the name without one.
+    return [{"name": name or "Someone",
+             "seconds": round(when - launched, 1) if launched and when >= launched else None}
+            for (sid, when), name in zip(winners, names)]
+
+
 def clear_answers(qid):
     """Throw away every answer to one question."""
     sids = db.zrange(k_answers(qid), 0, -1)
@@ -231,13 +268,17 @@ def state(student_id: Optional[str] = None):
     if not question:
         return {"open_question": None, "joined": joined, "answered": 0, "results": None,
                 "compare": None, "seconds_left": None, "accepting": True,
-                "session": session_id(), "you_exist": known}
+                "session": session_id(), "you_exist": known, "podium": None}
 
     reveal = bool(db.exists(k_reveal(question["id"])))
     shown = {"id": question["id"], "type": question["type"], "prompt": question["prompt"],
-             "options": question["options"], "pie": question["pie"], "reveal": reveal}
+             "options": question["options"], "pie": question["pie"], "reveal": reveal,
+             "fastest": question["fastest"]}
     if reveal and question["correct_index"] is not None:
         shown["correct_index"] = question["correct_index"]
+    # The winners are worked out all along but only handed out once the
+    # instructor reveals, so nobody learns the answer early.
+    winners = podium(question) if (reveal and question["fastest"]) else None
 
     compare = None
     if question["compare_with"]:
@@ -249,7 +290,7 @@ def state(student_id: Optional[str] = None):
             "answered": db.zcard(k_answers(question["id"])),
             "results": tally(question), "compare": compare,
             "seconds_left": seconds_left, "accepting": accepting,
-            "session": session_id(), "you_exist": known}
+            "session": session_id(), "you_exist": known, "podium": winners}
 
 
 @router.post("/answer", tags=["quiz"])
@@ -264,6 +305,10 @@ def answer(body: AnswerBody):
     sid = str(body.student_id or "")
     if not db.exists(k_student(sid)):
         raise HTTPException(404, "Unknown student - please join again")
+    if question["fastest"] and db.exists(k_answer(question["id"], sid)):
+        # It is a race, so the first tap is final - otherwise you could tap
+        # every option in turn and be timed on whichever one happened to fit.
+        raise HTTPException(409, "Your answer is already locked in")
 
     if question["type"] == "choice":
         try:
@@ -377,6 +422,7 @@ class QuestionBody(BaseModel):
     pie: bool = False
     compare_with: Optional[int] = None
     seconds: Any = 0                # countdown after launch; 0 = no time limit
+    fastest: bool = False           # fastest finger first: one shot, race to be right
 
 
 class MoveBody(BaseModel):
@@ -402,7 +448,9 @@ def clean(body: QuestionBody):
     return {"type": body.type, "prompt": prompt, "options": options, "correct_index": correct,
             "pie": bool(body.pie) and body.type == "choice",
             "compare_with": body.compare_with if body.type == "scale" else None,
-            "seconds": max(0, min(3600, seconds))}
+            "seconds": max(0, min(3600, seconds)),
+            # A race needs a right answer to race towards.
+            "fastest": bool(body.fastest) and body.type == "choice" and correct is not None}
 
 
 @router.get("/admin/questions", dependencies=ADMIN, tags=["quiz admin"])
@@ -473,8 +521,10 @@ def launch(qid: int, fresh: int = 0):
     if fresh:
         clear_answers(qid)
     db.set(K_OPEN, qid)                 # only one question is ever open
+    now = time.time()
+    db.set(K_LAUNCHED, now)             # the fastest-finger times are measured from here
     if question["seconds"]:             # start the countdown from right now
-        db.set(K_UNTIL, time.time() + question["seconds"])
+        db.set(K_UNTIL, now + question["seconds"])
     else:
         db.delete(K_UNTIL)
     forget_cache()
