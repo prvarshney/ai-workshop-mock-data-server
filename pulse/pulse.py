@@ -102,10 +102,21 @@ def countdown():
     return max(0, int(left + 0.999)), left > 0
 
 
+IN_DOCKER = os.path.exists("/.dockerenv")
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "").strip().rstrip("/")
+
+
 def join_url(request: Request) -> str:
-    """The address students type or scan. Prefer the real LAN IP; fall back to
-    whatever host the browser used to reach us."""
-    if LAN_IP:
+    """The address students type or scan.
+
+    PUBLIC_HOST wins if you set it - use it behind a proxy or a domain name.
+    Otherwise this machine's LAN address, except inside Docker, where that is
+    the container's private address that no phone could reach; there we use
+    whatever host the browser itself used to get here."""
+    if PUBLIC_HOST:
+        base = PUBLIC_HOST if "://" in PUBLIC_HOST else "http://" + PUBLIC_HOST
+        return base + "/quiz"
+    if LAN_IP and not IN_DOCKER:
         return f"http://{LAN_IP}:{PORT}/quiz"
     return f"http://{request.headers.get('host', 'localhost')}/quiz"
 
@@ -614,7 +625,7 @@ if __name__ == "__main__":
               "\n  SOLO=1 python pulse/pulse.py  runs Pulse on its own.", flush=True)
         os.execv(sys.executable, [sys.executable, _main])
 
-    where = LAN_IP or "localhost"
+    where = PUBLIC_HOST or (LAN_IP if not IN_DOCKER else "<this-server>") or "localhost"
     print(f"\n  Pulse"
           f"\n  storage    : {storage.STORAGE}"
           f"\n  lan ip     : {LAN_IP or 'not detected - using the browser host header'}"

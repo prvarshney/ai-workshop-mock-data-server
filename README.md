@@ -86,6 +86,61 @@ Prefer environment variables? They still work, and they win over `.env`:
 ADMIN_PASSWORD="..." PORT=9000 python main.py
 ```
 
+## Running it on a server with Docker
+
+If you start the server over SSH with `./start.sh`, closing the SSH session
+kills it — the shell sends `SIGHUP` to everything it started. Docker fixes that
+properly: the container keeps running when you log out, restarts if it crashes,
+and comes back after a reboot.
+
+On a fresh Ubuntu/Debian server:
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker "$USER"      # then log out and back in
+
+git clone git@github.com:prvarshney/ai-workshop-mock-data-server.git
+cd ai-workshop-mock-data-server
+```
+
+Create a `.env` (the same file `start.sh` uses — `docker compose` reads it
+automatically):
+
+```ini
+ADMIN_PASSWORD=something-only-you-know
+JWT_SECRET=paste-64-hex-chars-here
+PORT=8000
+```
+
+Generate the secret with
+`python3 -c 'import secrets; print(secrets.token_hex(32))'`. Compose refuses to
+start without `JWT_SECRET`, on purpose — without a fixed one, every restart
+logs you out.
+
+```bash
+docker compose up -d --build     # build and start, in the background
+docker compose logs -f           # watch the request log (Ctrl+C just stops watching)
+docker compose ps                # is it healthy?
+docker compose restart           # after pulling new code
+docker compose down              # stop; the data volumes stay
+```
+
+Then open `http://<server-ip>:8000/`. You can close the SSH session — it keeps
+running.
+
+| | |
+| --- | --- |
+| **Survives SSH exit / crash / reboot** | `restart: unless-stopped` on both containers |
+| **Redis** | Runs as its own container; no install needed on the host |
+| **Your questions** | `pulse.db` lives in a Docker volume, so edits survive rebuilds |
+| **Port** | `PORT` in `.env` is the port on the server. `PORT=80` maps host 80 to the container |
+| **Behind a domain or proxy** | Set `PUBLIC_HOST=quiz.example.com` so the join QR points at the right address |
+
+`PUBLIC_HOST` matters because inside a container the app cannot see the
+server's LAN address — it would otherwise put the container's private IP in the
+QR code. Left unset, the QR uses whatever address the browser used to reach the
+page, which is right for a plain `http://server-ip:8000` setup.
+
 ## Redis is optional
 
 Both apps keep their live state in Redis and **fall back to `fakeredis`
@@ -142,6 +197,7 @@ disturb a live session — except `smoke_test.py`, which calls SkyBook's
 | File | What it is |
 | --- | --- |
 | `start.sh` / `start.bat` | Loads `.env` and starts the server — **start here** |
+| `Dockerfile` / `docker-compose.yml` | Running it on a server, with Redis and restart-on-crash |
 | `.env` | Your password, signing secret and port. Created on first run, gitignored |
 | `main.py` | Runs both apps together on one port |
 | `mock_server.py` | SkyBook: the flight API and its dashboard |

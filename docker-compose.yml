@@ -1,0 +1,50 @@
+# Run the workshop app and its Redis together.
+#
+#   docker compose up -d          start, and keep it running
+#   docker compose logs -f        watch the request log
+#   docker compose restart        after pulling new code
+#   docker compose down           stop (the data volumes stay)
+#
+# restart: unless-stopped means it survives you closing SSH, the app crashing,
+# and the server rebooting.
+
+services:
+  app:
+    build: .
+    image: workshop-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Change this. Students can reach the admin page too.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-cu2026}"
+      # Keep this fixed so restarting does not log you out.
+      JWT_SECRET: "${JWT_SECRET:?set JWT_SECRET in .env - see README}"
+      JWT_HOURS: "${JWT_HOURS:-12}"
+      REDIS_URL: "redis://redis:6379/0"
+      # Only needed behind a proxy or a domain name. Left empty, the join QR
+      # uses whatever address the browser used, which is right for a plain
+      # "http://server-ip:8000" setup.
+      PUBLIC_HOST: "${PUBLIC_HOST:-}"
+    volumes:
+      # The question bank, so your edits survive a rebuild.
+      - questions:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  questions:
+  redis:

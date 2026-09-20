@@ -93,7 +93,14 @@ def index():
 
 
 if __name__ == "__main__":
-    where = LAN_IP or "localhost"
+    # With PUBLIC_HOST the address is complete as given; otherwise add our port.
+    if pulse_app.PUBLIC_HOST:
+        base = pulse_app.PUBLIC_HOST
+        if "://" not in base:
+            base = "http://" + base
+    else:
+        host = LAN_IP if not pulse_app.IN_DOCKER else "<this-server>"
+        base = f"http://{host or 'localhost'}:{PORT}"
     secret = ("from JWT_SECRET" if pulse_auth.SECRET_FROM_ENV
               else "generated now (set JWT_SECRET to stay logged in across restarts)")
     both = mock_server.STORAGE if mock_server.STORAGE == pulse_storage.STORAGE else \
@@ -103,11 +110,11 @@ if __name__ == "__main__":
           f"\n  questions  : {pulse_storage.DB_PATH}"
           f"\n  jwt secret : {secret}"
           + ("" if pulse_auth.SECRET_FROM_ENV else f"\n               JWT_SECRET={pulse_auth.JWT_SECRET}")
-          + f"\n\n  index      : http://{where}:{PORT}/"
-          f"\n  students   : http://{where}:{PORT}/quiz"
-          f"\n  projector  : http://{where}:{PORT}/quiz/screen"
-          f"\n  instructor : http://{where}:{PORT}/quiz/admin"
-          f"\n  bookings   : http://{where}:{PORT}/dashboard"
-          f"\n  api docs   : http://{where}:{PORT}/docs"
+          + f"\n\n  index      : {base}/"
+          f"\n  students   : {base}/quiz"
+          f"\n  projector  : {base}/quiz/screen"
+          f"\n  instructor : {base}/quiz/admin"
+          f"\n  bookings   : {base}/dashboard"
+          f"\n  api docs   : {base}/docs"
           f"\n\n  students use the address above, not localhost\n", flush=True)
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")
